@@ -1,0 +1,92 @@
+[
+  {
+    "question_text": "Regarding the sun's thermal properties, what specific characteristic is mentioned?",
+    "question_type": "ai_generated",
+    "answers": [
+      {
+        "text": "It ensures life continues to exist.",
+        "is_correct": false
+      },
+      {
+        "text": "It is extremely hot.",
+        "is_correct": true
+      },
+      {
+        "text": "It provides heat to plants.",
+        "is_correct": false
+      }
+    ]
+  },
+  {
+    "question_text": "According to the text, what is a direct consequence of the sun's existence?",
+    "question_type": "ai_generated",
+    "answers": [
+      {
+        "text": "Life is absent.",
+        "is_correct": false
+      },
+      {
+        "text": "Plants are able to grow.",
+        "is_correct": true
+      },
+      {
+        "text": "The solar system is extremely hot.",
+        "is_correct": false
+      }
+    ]
+  },
+  {
+    "question_text": "What explicit role does the sun play concerning organic growth?",
+    "question_type": "ai_generated",
+    "answers": [
+      {
+        "text": "It heats the entire solar system to facilitate growth.",
+        "is_correct": false
+      },
+      {
+        "text": "Plants use it to grow.",
+        "is_correct": true
+      },
+      {
+        "text": "It ensures all life forms can grow.",
+        "is_correct": false
+      }
+    ]
+  },
+  {
+    "question_text": "The article states the sun provides heat to what specific entity?",
+    "question_type": "ai_generated",
+    "answers": [
+      {
+        "text": "Life.",
+        "is_correct": false
+      },
+      {
+        "text": "Plants.",
+        "is_correct": false
+      },
+      {
+        "text": "The entire solar system.",
+        "is_correct": true
+      }
+    ]
+  },
+  {
+    "question_text": "Which characteristic is attributed solely to the sun itself, rather than its effect on other entities?",
+    "question_type": "ai_generated",
+    "answers": [
+      {
+        "text": "It enables plants to grow.",
+        "is_correct": false
+      },
+      {
+        "text": "It is extremely hot.",
+        "is_correct": true
+      },
+      {
+        "text": "It prevents the cessation of life.",
+        "is_correct": false
+      }
+    ]
+  }
+]

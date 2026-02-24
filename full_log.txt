@@ -1,0 +1,64 @@
+Fetching live RSS feed: https://feeds.bbci.co.uk/news/technology/rss.xml
+Available RSS entry keys: ['title', 'title_detail', 'summary', 'summary_detail', 'links', 'link', 'id', 'guidislink', 'published', 'published_parsed', 'media_thumbnail', 'href']
+RSS entry has content attribute: False
+Raw RSS description length: 98 characters
+Raw RSS description preview (first 200 chars): Deepfakes showing grim taxpayer-funded waterparks have gone viral and drawn some racist responses.
+RSS Feed Content:
+  description length: 98
+  summary length: 98
+  content length: 0
+  subtitle length: 0
+  encoded_content length: 0
+  media_description length: 0
+  itunes_summary length: 0
+  full_text (scraped) length: 40137
+Combined RSS content length: 98 characters, 13 words
+Total content length: 40236 characters, 6844 words
+Sources: full_text=40137, desc=98, content=0, summary=98
+Detected language: en
+Article is in English, proceeding with processing
+Ingesting real article from BBC News: Why fake AI videos of UK urban decline are taking over social media
+Extracting entities from: Deepfakes showing grim taxpayer-funded waterparks ...
+Simplifying text down to Grade 6...
+Simplified text word count: 433 (truncated to < 20 lines)
+Running Fact-Checking Pipeline...
+Generating tough quizzes...
+GEMINI_API_KEY detected. Utilizing Real AI for Quiz Generation...
+Real AI Quiz Generation Failed. Error: 403 Generative Language API has not been used in project 827600203212 before or it is disabled. Enable it by visiting https://console.developers.google.com/apis/api/generativelanguage.googleapis.com/overview?project=827600203212 then retry. If you enabled this API recently, wait a few minutes for the action to propagate to our systems and retry. [reason: "SERVICE_DISABLED"
+domain: "googleapis.com"
+metadata {
+  key: "service"
+  value: "generativelanguage.googleapis.com"
+}
+metadata {
+  key: "serviceTitle"
+  value: "Generative Language API"
+}
+metadata {
+  key: "containerInfo"
+  value: "827600203212"
+}
+metadata {
+  key: "consumer"
+  value: "projects/827600203212"
+}
+metadata {
+  key: "activationUrl"
+  value: "https://console.developers.google.com/apis/api/generativelanguage.googleapis.com/overview?project=827600203212"
+}
+, locale: "en-US"
+message: "Generative Language API has not been used in project 827600203212 before or it is disabled. Enable it by visiting https://console.developers.google.com/apis/api/generativelanguage.googleapis.com/overview?project=827600203212 then retry. If you enabled this API recently, wait a few minutes for the action to propagate to our systems and retry."
+, links {
+  description: "Google developers console API activation"
+  url: "https://console.developers.google.com/apis/api/generativelanguage.googleapis.com/overview?project=827600203212"
+}
+]
+Falling back to deterministic algorithmic generator...
+SAVING TO DATABASE:
+  Simplified text length: 2538 characters
+  Simplified text word count: 433 words
+  Original text length: 40236 characters
+  Original text word count: 6844 words
+  Simplified text preview (first 300 chars): Deepfakes showing grim taxpayer-funded waterparks have gone viral and drawn some racist responses. An AI-generated video shows a crowd of young - mostly black - men, wearing balaclavas and padded jackets, slipping down a water slide into a dirty swimming pool with litter bobbing on the surface. The 
+  Simplified text preview (last 300 chars): . Several of the videos "blew up", he says, because they were very graphic, showing people flying off slides. The young men in his videos are "roadmen", a slang term for urban youth, often associated with drug dealing, he says, and are "cultural archetypes" that he frequently features in his videos.
+  VERIFIED SAVED: 2538 characters in database
