@@ -1,11 +1,14 @@
 {
   "name": "frontend",
+  "homepage": "https://K0L4R.github.io/ai-news-summarize",
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "predeploy": "npm run build",
+    "deploy": "gh-pages -d dist"
   },
   "keywords": [],
   "author": "",
@@ -13,6 +16,7 @@
   "description": "",
   "dependencies": {
     "framer-motion": "^12.34.3",
+    "gh-pages": "^6.3.0",
     "lucide-react": "^0.575.0",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
