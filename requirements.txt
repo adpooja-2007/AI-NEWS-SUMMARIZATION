@@ -5,3 +5,5 @@ apscheduler
 python-dotenv
 requests
 beautifulsoup4
+feedparser
+googletrans==4.0.0rc1
