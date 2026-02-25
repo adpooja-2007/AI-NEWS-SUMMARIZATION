@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ArrowLeft, ShieldCheck, AlertTriangle, ChevronDown, ChevronUp } from 'lucide-react'
+import { ArrowLeft, ShieldCheck, AlertTriangle, ChevronDown, ChevronUp, BookOpen, Clock, CheckCircle, Brain, ExternalLink, Trophy } from 'lucide-react'
+import { useAuth } from '../context/AuthContext'
+import { useLanguage } from '../context/LanguageContext'
 
 export default function ArticleDetail() {
     const { id } = useParams()
@@ -11,11 +13,14 @@ export default function ArticleDetail() {
     const [quizResult, setQuizResult] = useState(null)
     const [showOriginal, setShowOriginal] = useState(false)
 
+    const { user } = useAuth()
+    const { t, language } = useLanguage()
+
     useEffect(() => {
         const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8001'
         const token = localStorage.getItem('token')
 
-        fetch(`${baseUrl}/api/articles/${id}`, {
+        fetch(`${baseUrl}/api/articles/${id}?lang=${language}`, {
             headers: { 'Authorization': `Bearer ${token}` }
         })
             .then(res => res.json())
@@ -34,7 +39,7 @@ export default function ArticleDetail() {
             headers: { 'Authorization': `Bearer ${token}` }
         }).catch(err => console.error("Failed to record view", err))
 
-    }, [id])
+    }, [id, language])
 
     const handleSelectAnswer = (quizId, answerId) => {
         setAnswers(prev => ({ ...prev, [quizId]: answerId }))
@@ -74,10 +79,17 @@ export default function ArticleDetail() {
     return (
         <div className="relative transition-colors duration-300">
             <Link to="/" className="inline-flex items-center gap-2 text-text-muted hover:text-brand-primary font-semibold mb-8 transition-colors">
-                <ArrowLeft size={20} /> Back to Feed
+                <ArrowLeft size={20} /> {t('backToFeed')}
             </Link>
 
             <article className="bg-bg-card rounded-3xl p-6 sm:p-12 shadow-sm border border-border-main transition-colors duration-300">
+                {article.is_available === false && (
+                    <div className="mb-6 bg-red-500/10 border border-red-500/20 rounded-xl p-4 flex items-center gap-3 text-red-600 font-bold">
+                        <AlertTriangle size={24} className="shrink-0" />
+                        <span>{t('translationUnavailable')}</span>
+                    </div>
+                )}
+
                 <h1 className="text-3xl sm:text-5xl font-extrabold text-text-main leading-tight mb-8 tracking-tight">
                     {article.headline}
                 </h1>
@@ -107,7 +119,7 @@ export default function ArticleDetail() {
                     <div className="bg-bg-hover border-2 border-border-main rounded-3xl p-8 sm:p-10 mb-16 relative overflow-hidden transition-colors duration-300">
                         <div className="absolute top-0 left-0 w-2 h-full bg-gradient-to-b from-brand-gradient-1 to-brand-gradient-2"></div>
                         <h3 className="text-2xl font-black text-text-main mb-8 border-b-2 border-border-main pb-4">
-                            Check Your Understanding
+                            {t('testComprehension')}
                         </h3>
 
                         <AnimatePresence>
@@ -156,7 +168,7 @@ export default function ArticleDetail() {
                                         onClick={() => setQuizResult(null) || setAnswers({})}
                                         className="w-full sm:w-auto mt-6 bg-bg-card border-2 border-border-main hover:border-brand-primary text-text-main hover:text-brand-primary font-bold text-lg py-3 px-8 rounded-xl transition-all"
                                     >
-                                        Retake Quiz
+                                        {t('retakeQuiz')}
                                     </button>
                                 </motion.div>
                             ) : (
@@ -196,7 +208,7 @@ export default function ArticleDetail() {
                                         type="submit"
                                         className="w-full sm:w-auto mt-4 bg-gradient-to-r from-brand-gradient-1 to-brand-gradient-2 hover:opacity-90 text-white font-bold text-lg py-4 px-10 rounded-xl shadow-lg hover:shadow-xl hover:-translate-y-1 transition-all"
                                     >
-                                        Submit Answers
+                                        {t('submitAnswers')}
                                     </button>
                                 </form>
                             )}
@@ -223,7 +235,7 @@ export default function ArticleDetail() {
                                 className="p-6 sm:p-8 bg-bg-card border-t border-border-main"
                             >
                                 <div className="mb-6 pb-6 border-b border-border-main flex justify-between items-center text-sm font-bold text-text-muted">
-                                    <span>Source Original • {article.publisher_name}</span>
+                                    <span>{t('originalSource')} • {article.publisher_name}</span>
                                     <a href={article.original_url} target="_blank" rel="noreferrer" className="text-brand-primary hover:text-brand-gradient-2 hover:underline transition-colors">View Link ↗</a>
                                 </div>
                                 <div className="prose prose-lg max-w-none text-text-muted">

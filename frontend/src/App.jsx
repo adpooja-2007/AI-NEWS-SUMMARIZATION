@@ -9,6 +9,7 @@ import { Signup } from './pages/Signup'
 import { AuthProvider } from './context/AuthContext'
 import { ThemeProvider } from './context/ThemeContext'
 import { useAuth } from './context/AuthContext'
+import { LanguageProvider } from './context/LanguageContext'
 
 // Protected Route Wrapper Component
 const ProtectedRoute = ({ children }) => {
@@ -28,23 +29,25 @@ const ProtectedRoute = ({ children }) => {
 function App() {
     return (
         <ThemeProvider>
-            <AuthProvider>
-                <Router>
-                    <Layout>
-                        <Routes>
-                            {/* Protected Routes */}
-                            <Route path="/" element={<ProtectedRoute><Feed /></ProtectedRoute>} />
-                            <Route path="/archive" element={<ProtectedRoute><ArchivePage /></ProtectedRoute>} />
-                            <Route path="/article/:id" element={<ProtectedRoute><ArticleDetail /></ProtectedRoute>} />
-                            <Route path="/progress" element={<ProtectedRoute><AdminDashboard /></ProtectedRoute>} />
+            <LanguageProvider>
+                <AuthProvider>
+                    <Router>
+                        <Layout>
+                            <Routes>
+                                {/* Protected Routes */}
+                                <Route path="/" element={<ProtectedRoute><Feed /></ProtectedRoute>} />
+                                <Route path="/archive" element={<ProtectedRoute><ArchivePage /></ProtectedRoute>} />
+                                <Route path="/article/:id" element={<ProtectedRoute><ArticleDetail /></ProtectedRoute>} />
+                                <Route path="/progress" element={<ProtectedRoute><AdminDashboard /></ProtectedRoute>} />
 
-                            {/* Public Routes */}
-                            <Route path="/login" element={<Login />} />
-                            <Route path="/signup" element={<Signup />} />
-                        </Routes>
-                    </Layout>
-                </Router>
-            </AuthProvider>
+                                {/* Public Routes */}
+                                <Route path="/login" element={<Login />} />
+                                <Route path="/signup" element={<Signup />} />
+                            </Routes>
+                        </Layout>
+                    </Router>
+                </AuthProvider>
+            </LanguageProvider>
         </ThemeProvider>
     )
 }

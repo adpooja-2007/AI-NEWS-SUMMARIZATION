@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useLanguage } from '../context/LanguageContext';
 import { FiUser, FiMail, FiLock, FiAlertCircle, FiUserPlus } from 'react-icons/fi';
 
 export const Signup = () => {
@@ -11,6 +12,7 @@ export const Signup = () => {
     const [loading, setLoading] = useState(false);
 
     const { register } = useAuth();
+    const { t } = useLanguage();
     const navigate = useNavigate();
 
     const handleSubmit = async (e) => {
@@ -36,8 +38,8 @@ export const Signup = () => {
                 <div className="absolute -bottom-32 -right-32 w-64 h-64 bg-brand-gradient-2/20 rounded-full blur-3xl pointer-events-none"></div>
 
                 <div className="relative z-10 text-center mb-8">
-                    <h2 className="text-3xl font-bold bg-gradient-to-r from-brand-gradient-1 to-brand-gradient-2 bg-clip-text text-transparent mb-2">Create Account</h2>
-                    <p className="text-text-muted">Join the AI News Platform today.</p>
+                    <h2 className="text-3xl font-bold bg-gradient-to-r from-brand-gradient-1 to-brand-gradient-2 bg-clip-text text-transparent mb-2">{t('joinClearNews')}</h2>
+                    <p className="text-text-muted">{t('createAccount')}</p>
                 </div>
 
                 {error && (
@@ -49,7 +51,7 @@ export const Signup = () => {
 
                 <form onSubmit={handleSubmit} className="space-y-5">
                     <div className="space-y-1">
-                        <label className="text-sm font-medium text-text-main ml-1">Username</label>
+                        <label className="text-sm font-medium text-text-main ml-1">{t('username')}</label>
                         <div className="relative">
                             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-text-muted">
                                 <FiUser className="w-5 h-5" />
@@ -66,7 +68,7 @@ export const Signup = () => {
                     </div>
 
                     <div className="space-y-1">
-                        <label className="text-sm font-medium text-text-main ml-1">Email Address</label>
+                        <label className="text-sm font-medium text-text-main ml-1">{t('emailAddress')}</label>
                         <div className="relative">
                             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-text-muted">
                                 <FiMail className="w-5 h-5" />
@@ -83,7 +85,7 @@ export const Signup = () => {
                     </div>
 
                     <div className="space-y-1">
-                        <label className="text-sm font-medium text-text-main ml-1">Password</label>
+                        <label className="text-sm font-medium text-text-main ml-1">{t('password')}</label>
                         <div className="relative">
                             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-text-muted">
                                 <FiLock className="w-5 h-5" />
@@ -107,7 +109,7 @@ export const Signup = () => {
                     >
                         {loading ? 'Creating Account...' : (
                             <>
-                                Sign Up
+                                {t('signUp')}
                                 <FiUserPlus className="ml-2 w-4 h-4 group-hover:scale-110 transition-transform" />
                             </>
                         )}
@@ -115,9 +117,9 @@ export const Signup = () => {
                 </form>
 
                 <p className="mt-8 text-center text-sm text-text-muted relative z-10">
-                    Already have an account?{' '}
+                    {t('alreadyHaveAccount')}{' '}
                     <Link to="/login" className="text-brand-primary hover:text-brand-gradient-2 font-medium transition-colors">
-                        Sign in instead
+                        {t('signIn')}
                     </Link>
                 </p>
             </div>

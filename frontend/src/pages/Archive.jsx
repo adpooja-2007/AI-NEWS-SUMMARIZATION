@@ -14,12 +14,14 @@ export default function ArchivePage() {
         const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8001'
         const token = localStorage.getItem('token')
 
-        fetch(`${baseUrl}/api/articles`, {
+        // Fetch a large limit for the archive view
+        fetch(`${baseUrl}/api/articles?limit=500`, {
             headers: { 'Authorization': `Bearer ${token}` }
         })
             .then(res => res.json())
             .then(data => {
-                setArticles(data)
+                // Ensure we extract the array from the paginated response format
+                setArticles(data.articles || [])
                 setLoading(false)
             })
             .catch(err => {

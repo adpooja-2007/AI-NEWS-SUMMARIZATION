@@ -3,11 +3,13 @@ import { Home, Calendar, User, Globe, LogIn, LogOut, UserPlus, ShieldAlert, Sun,
 import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth } from '../context/AuthContext'
 import { useTheme } from '../context/ThemeContext'
+import { useLanguage } from '../context/LanguageContext'
 
 export default function Layout({ children }) {
     const location = useLocation()
     const { user, logout } = useAuth()
     const { isDarkMode, toggleTheme } = useTheme()
+    const { language, toggleLanguage, t } = useLanguage()
 
     return (
         <div className="min-h-screen flex flex-col font-sans bg-bg-base text-text-main transition-colors duration-300">
@@ -19,14 +21,12 @@ export default function Layout({ children }) {
 
                     {/* Brand */}
                     <div className="flex items-center justify-start z-20">
-                        <Link to="/" className="flex items-center gap-3 group">
-                            <div className="bg-gradient-to-br from-brand-gradient-1 to-brand-gradient-2 p-2 rounded-xl flex items-center justify-center shadow-lg shadow-brand-primary/20 group-hover:shadow-brand-primary/40 transition-all duration-300">
-                                <div className="w-4 h-4 border-2 border-bg-base rounded-md transform rotate-45 group-hover:rotate-0 transition-transform duration-500"></div>
-                            </div>
-                            <h1 className="text-xl font-bold tracking-tight flex">
-                                <span className="text-text-main">NEWS</span>
-                                <span className="text-brand-primary ml-1">SIMPLE</span>
-                            </h1>
+                        <Link to="/" className="flex items-center group">
+                            <img
+                                src="/logo.png"
+                                alt="News Simple Logo"
+                                className="h-12 w-auto object-contain transition-transform duration-300 group-hover:scale-105"
+                            />
                         </Link>
                     </div>
 
@@ -36,15 +36,15 @@ export default function Layout({ children }) {
                             <nav className="flex items-center gap-8 px-8 py-3 bg-bg-hover/50 rounded-full border border-border-main transition-colors duration-300 shadow-sm">
                                 <Link to="/" className={`flex items-center gap-2 text-sm font-medium transition-colors ${location.pathname === '/' ? 'text-brand-primary' : 'text-text-muted hover:text-text-main'}`}>
                                     <Home size={16} />
-                                    <span>Feed</span>
+                                    <span>{t('feed')}</span>
                                 </Link>
                                 <Link to="/archive" className={`flex items-center gap-2 text-sm font-medium transition-colors ${location.pathname === '/archive' ? 'text-brand-primary' : 'text-text-muted hover:text-text-main'}`}>
                                     <Calendar size={16} />
-                                    <span>Archive</span>
+                                    <span>{t('archive')}</span>
                                 </Link>
                                 <Link to="/progress" className={`flex items-center gap-2 text-sm font-medium transition-colors ${location.pathname === '/progress' ? 'text-brand-primary' : 'text-text-muted hover:text-text-main'}`}>
                                     <User size={16} />
-                                    <span>Progress</span>
+                                    <span>{t('progress')}</span>
                                 </Link>
                             </nav>
                         )}
@@ -59,9 +59,11 @@ export default function Layout({ children }) {
                             {isDarkMode ? <Sun size={18} /> : <Moon size={18} />}
                         </button>
 
-                        <button className="hidden sm:flex items-center gap-2 px-3 py-2 bg-bg-hover hover:bg-bg-hover-dark rounded-xl text-sm font-medium text-text-muted transition-colors border border-border-main">
-                            <Globe size={16} className="text-text-muted" />
-                            <span>EN</span>
+                        <button
+                            onClick={toggleLanguage}
+                            className="hidden sm:flex items-center gap-2 px-3 py-2 bg-bg-hover hover:bg-bg-hover-dark rounded-xl text-sm font-medium text-text-muted transition-colors border border-border-main">
+                            <Globe size={16} className="text-brand-primary" />
+                            <span className="uppercase">{language}</span>
                         </button>
 
                         <div className="w-px h-8 bg-border-main mx-1 hidden sm:block transition-colors duration-300"></div>
@@ -82,11 +84,11 @@ export default function Layout({ children }) {
                             <div className="flex items-center gap-3">
                                 <Link to="/login" className="flex items-center gap-2 px-4 py-2.5 text-text-muted hover:text-text-main text-sm font-medium transition-colors bg-bg-hover rounded-xl border border-border-main">
                                     <LogIn size={16} />
-                                    <span className="hidden sm:inline">Log In</span>
+                                    <span className="hidden sm:inline">{t('logIn')}</span>
                                 </Link>
                                 <Link to="/signup" className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-brand-gradient-1 to-brand-gradient-2 text-white rounded-xl text-sm font-medium hover:opacity-90 shadow-lg shadow-brand-primary/20 transition-all">
                                     <UserPlus size={16} />
-                                    <span className="hidden sm:inline">Sign Up</span>
+                                    <span className="hidden sm:inline">{t('signUp')}</span>
                                 </Link>
                             </div>
                         )}
@@ -100,15 +102,15 @@ export default function Layout({ children }) {
                     <nav className="flex items-center justify-around p-4 h-16">
                         <Link to="/" className={`flex flex-col items-center gap-1 ${location.pathname === '/' ? 'text-brand-primary' : 'text-text-muted'}`}>
                             <Home size={20} />
-                            <span className="text-[10px] font-medium">Feed</span>
+                            <span className="text-[10px] font-medium">{t('feed')}</span>
                         </Link>
                         <Link to="/archive" className={`flex flex-col items-center gap-1 ${location.pathname === '/archive' ? 'text-brand-primary' : 'text-text-muted'}`}>
                             <Calendar size={20} />
-                            <span className="text-[10px] font-medium">Archive</span>
+                            <span className="text-[10px] font-medium">{t('archive')}</span>
                         </Link>
                         <Link to="/progress" className={`flex flex-col items-center gap-1 ${location.pathname === '/progress' ? 'text-brand-primary' : 'text-text-muted'}`}>
                             <User size={20} />
-                            <span className="text-[10px] font-medium">Progress</span>
+                            <span className="text-[10px] font-medium">{t('progress')}</span>
                         </Link>
                     </nav>
                 </div>

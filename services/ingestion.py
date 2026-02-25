@@ -8,17 +8,15 @@ import os
 import uuid
 from datetime import datetime
 import asyncio
+import urllib.request
+import copy # Added for deepcopy
 
 # Public RSS feeds - English only, no Hindi or other non-English feeds
 LIVE_RSS_FEEDS = [
     "http://feeds.bbci.co.uk/news/world/rss.xml",
     "https://feeds.bbci.co.uk/news/technology/rss.xml",
     "https://www.thehindu.com/news/national/feeder/default.rss"
-    # Removed: Times of India (may contain Hindi content)
-    # Removed: Any BBC Hindi feeds
 ]
-
-import urllib.request
 
 def clean_html(raw_html):
     """Utility to strip HTML tags from RSS item descriptions - PRESERVE ALL TEXT."""
@@ -59,43 +57,10 @@ def fetch_full_article_text(url):
         print(f"Failed to fetch full article {url}: {e}")
         return ""
 
-async def ingest_rss_feed():
+async def process_article_logic(article_data, parsed_feed):
     """
-    Pulls a real live RSS feed URL.
-    Fetches the first unprocessed article, saves it, and triggers pipeline.
+    Core logic to process a single article data item.
     """
-    target_feed = random.choice(LIVE_RSS_FEEDS)
-    print(f"Fetching live RSS feed: {target_feed}")
-    
-    # Skip if feed URL contains "hindi" (case-insensitive)
-    if "hindi" in target_feed.lower():
-        print(f"Skipping feed: {target_feed} - contains 'hindi'")
-        return {"status": "SKIPPED", "msg": "Hindi feed excluded."}
-    
-    parsed_feed = feedparser.parse(target_feed)
-    
-    # Check feed title for Hindi
-    feed_title = parsed_feed.feed.get("title", "").lower()
-    if "hindi" in feed_title:
-        print(f"Skipping feed: {target_feed} - feed title contains 'hindi': {feed_title}")
-        return {"status": "SKIPPED", "msg": f"Feed is Hindi: {feed_title}"}
-    
-    if not parsed_feed.entries:
-        return {"status": "FAILED", "msg": "No entries found in RSS feed."}
-        
-    # Find the newest article we haven't processed yet
-    article_data = None
-    for item in parsed_feed.entries:
-        link = item.get("link", "")
-        # Check if already processed
-        existing = await articles_collection.find_one({"original.source_url": link})
-        if not existing:
-            article_data = item
-            break
-            
-    if not article_data:
-        return {"status": "SKIPPED", "msg": "All available articles in this feed are already ingested."}
-        
     headline = article_data.get("title", "No Title")
     url = article_data.get("link", "")
     publisher = parsed_feed.feed.get("title", "Unknown Source")
@@ -129,10 +94,6 @@ async def ingest_rss_feed():
     full_text = fetch_full_article_text(url)
     
     # Handle the raw text extraction - GET EVERYTHING FROM RSS FEED
-    # Get ALL possible content fields from RSS (different feeds use different field names)
-    
-    # Standard RSS fields - check multiple possible field names
-    # Some feeds use "description", others use "summary" (like BBC)
     raw_html_desc = article_data.get("description", "") or article_data.get("desc", "") or article_data.get("summary", "")
     raw_summary = article_data.get("summary", "") or article_data.get("description", "")
     subtitle = article_data.get("subtitle", "")
@@ -187,15 +148,6 @@ async def ingest_rss_feed():
     
     content = " ".join([c for c in content_parts if c])
     
-    # DEBUG: Print ALL available fields in the RSS entry
-    print(f"Available RSS entry keys: {list(article_data.keys())}")
-    print(f"RSS entry has content attribute: {hasattr(article_data, 'content')}")
-    
-    # DEBUG: Show raw description length before cleaning
-    print(f"Raw RSS description length: {len(raw_html_desc)} characters")
-    if raw_html_desc:
-        print(f"Raw RSS description preview (first 200 chars): {raw_html_desc[:200]}")
-    
     # Try to import translator, but handle if it's not available
     translator = None
     try:
@@ -215,119 +167,55 @@ async def ingest_rss_feed():
     cleaned_itunes = clean_html(itunes_summary) if itunes_summary else ""
     
     # DEBUG: Print what we're getting from RSS feed
-    print(f"RSS Feed Content:")
-    print(f"  description length: {len(cleaned_desc) if cleaned_desc else 0}")
-    print(f"  summary length: {len(cleaned_summary) if cleaned_summary else 0}")
-    print(f"  content length: {len(cleaned_content) if cleaned_content else 0}")
-    print(f"  subtitle length: {len(cleaned_subtitle) if cleaned_subtitle else 0}")
-    print(f"  encoded_content length: {len(cleaned_encoded) if cleaned_encoded else 0}")
-    print(f"  media_description length: {len(cleaned_media) if cleaned_media else 0}")
-    print(f"  itunes_summary length: {len(cleaned_itunes) if cleaned_itunes else 0}")
+    print(f"RSS Feed Content for '{headline}':")
     print(f"  full_text (scraped) length: {len(full_text) if full_text else 0}")
     
-    # PRIORITIZE RSS FEED CONTENT - it usually has the full article
-    # Combine ALL RSS feed fields - APPEND EVERYTHING, minimal duplicate checking
+    # Combine ALL RSS feed fields
     rss_content_parts = []
     seen_texts = set()
     
-    # Add RSS description first (most RSS feeds put full content here)
-    if cleaned_desc and cleaned_desc not in seen_texts:
-        rss_content_parts.append(cleaned_desc)
-        seen_texts.add(cleaned_desc)
+    for text_part in [cleaned_desc, cleaned_encoded, cleaned_summary, cleaned_content, cleaned_media, cleaned_itunes, cleaned_subtitle]:
+        if text_part and text_part not in seen_texts:
+            rss_content_parts.append(text_part)
+            seen_texts.add(text_part)
     
-    # Add encoded content (often has full article)
-    if cleaned_encoded and cleaned_encoded not in seen_texts:
-        rss_content_parts.append(cleaned_encoded)
-        seen_texts.add(cleaned_encoded)
-    
-    # Add summary
-    if cleaned_summary and cleaned_summary not in seen_texts:
-        rss_content_parts.append(cleaned_summary)
-        seen_texts.add(cleaned_summary)
-    
-    # Add content field
-    if cleaned_content and cleaned_content not in seen_texts:
-        rss_content_parts.append(cleaned_content)
-        seen_texts.add(cleaned_content)
-    
-    # Add media description
-    if cleaned_media and cleaned_media not in seen_texts:
-        rss_content_parts.append(cleaned_media)
-        seen_texts.add(cleaned_media)
-    
-    # Add itunes summary
-    if cleaned_itunes and cleaned_itunes not in seen_texts:
-        rss_content_parts.append(cleaned_itunes)
-        seen_texts.add(cleaned_itunes)
-    
-    # Add subtitle
-    if cleaned_subtitle and cleaned_subtitle not in seen_texts:
-        rss_content_parts.append(cleaned_subtitle)
-        seen_texts.add(cleaned_subtitle)
-    
-    # Combine RSS feed content - just append with space separator
     rss_combined = " ".join(rss_content_parts).strip()
     
-    print(f"Combined RSS content length: {len(rss_combined)} characters, {len(rss_combined.split())} words")
-    
     # Decide which content to use as primary source
-    # If RSS content is very short (< 500 chars), prioritize scraped full article
-    # If RSS content is substantial, use it as primary
     if full_text and len(full_text) > 500:
-        # Scraped full article is substantial - use it as primary
         if rss_combined and len(rss_combined) > 200:
-            # Both are substantial - combine them (RSS first, then full article)
             raw_text = rss_combined + " " + full_text
         else:
-            # RSS is too short, use scraped full article
             raw_text = full_text
             if rss_combined:
-                # Prepend RSS summary for context
                 raw_text = rss_combined + " " + raw_text
     elif rss_combined and len(rss_combined) > 200:
-        # RSS content is substantial, use it
         raw_text = rss_combined
         if full_text:
-            # Append scraped content if available
             raw_text = raw_text + " " + full_text
     else:
-        # Use whatever we have
         raw_text = full_text if full_text else rss_combined
         if full_text and rss_combined:
             raw_text = rss_combined + " " + full_text
     
-    # Final fallback: if we still don't have much, combine ALL sources
+    # Final fallback
     if len(raw_text) < 100:
         all_sources = [rss_combined, full_text, cleaned_content, cleaned_desc, cleaned_summary, cleaned_subtitle, cleaned_encoded, cleaned_media, cleaned_itunes]
-        all_sources = [s for s in all_sources if s and len(s) > 5]  # Only non-empty
+        all_sources = [s for s in all_sources if s and len(s) > 5]
         if all_sources:
             raw_text = " ".join(all_sources)
     
-    # NO CHARACTER LIMIT - USE ENTIRE TEXT
-    print(f"Total content length: {len(raw_text)} characters, {len(raw_text.split())} words")
-    print(f"Sources: full_text={len(full_text) if full_text else 0}, desc={len(cleaned_desc) if cleaned_desc else 0}, content={len(cleaned_content) if cleaned_content else 0}, summary={len(cleaned_summary) if cleaned_summary else 0}")
+    print(f"Total content length: {len(raw_text)} characters")
     
     # Detect language and skip non-English articles
     def detect_language_simple(text):
-        """Simple language detection - check for non-Latin scripts"""
         if not text or len(text) < 50:
             return "unknown"
+        if any('\u0900' <= char <= '\u097F' for char in text[:500]): return "hindi"
+        if any('\u4E00' <= char <= '\u9FFF' for char in text[:500]): return "chinese"
+        if any('\u0600' <= char <= '\u06FF' for char in text[:500]): return "arabic"
+        if any('\u0400' <= char <= '\u04FF' for char in text[:500]): return "russian"
         
-        # Check for common non-English scripts
-        # Devanagari (Hindi, Sanskrit, etc.)
-        if any('\u0900' <= char <= '\u097F' for char in text[:500]):
-            return "hindi"
-        # Chinese, Japanese, Korean
-        if any('\u4E00' <= char <= '\u9FFF' for char in text[:500]):
-            return "chinese"
-        # Arabic
-        if any('\u0600' <= char <= '\u06FF' for char in text[:500]):
-            return "arabic"
-        # Cyrillic (Russian, etc.)
-        if any('\u0400' <= char <= '\u04FF' for char in text[:500]):
-            return "russian"
-        
-        # If we have translator, use it for more accurate detection
         if translator:
             try:
                 detection = translator.detect(text[:500])
@@ -335,40 +223,21 @@ async def ingest_rss_feed():
                     return detection.lang
             except:
                 pass
-        
-        # Default to English if no non-Latin scripts found
         return "en"
     
-    # Detect language
     detected_lang = detect_language_simple(raw_text)
-    print(f"Detected language: {detected_lang}")
     
-    # Skip non-English articles
     if detected_lang not in ["en", "unknown"]:
         print(f"Skipping article '{headline}' - language is {detected_lang}, not English")
         return {"status": "SKIPPED", "msg": f"Article is in {detected_lang}, only English articles are processed."}
     
-    # Article is already filtered to be English only, no translation needed
-    if detected_lang == "en":
-        print("Article is in English, proceeding with processing")
-    elif detected_lang == "unknown":
-        print("Language detection uncertain, but no non-Latin scripts detected - proceeding")
-    else:
-        # This shouldn't happen as we already filtered above, but just in case
-        print(f"Unexpected language {detected_lang}, skipping")
-        return {"status": "SKIPPED", "msg": f"Article is in {detected_lang}, only English articles are processed."}
-    
-    # If text is too short, try to get more content or skip
+    # If text is too short, try to fetch more aggressively
     if len(raw_text) < 100:
-        # Try to fetch more aggressively
         if not full_text or len(full_text) < 100:
-            # Try fetching again with different approach
             try:
                 req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'})
                 html = urllib.request.urlopen(req, timeout=15).read()
                 soup = BeautifulSoup(html, "html.parser")
-                
-                # Try to find main content area
                 main_content = soup.find('main') or soup.find('div', {'id': 'content'}) or soup.find('div', {'class': 'article-body'})
                 if main_content:
                     paragraphs = main_content.find_all(['p', 'div'])
@@ -378,7 +247,6 @@ async def ingest_rss_feed():
             except:
                 pass
         
-        # If still too short, skip this article
         if len(raw_text) < 100:
             print(f"Skipping article '{headline}' - insufficient content (only {len(raw_text)} chars)")
             return {"status": "SKIPPED", "msg": f"Article has insufficient content ({len(raw_text)} chars). Minimum 100 chars required."}
@@ -389,7 +257,6 @@ async def ingest_rss_feed():
     pipeline_result = run_nlp_pipeline(raw_text)
     
     if pipeline_result["status"] == "FAIL_MAX_RETRIES":
-        # Save as failed
         failed_doc = {
             "original": {
                 "source_url": url,
@@ -406,10 +273,8 @@ async def ingest_rss_feed():
         await articles_collection.insert_one(failed_doc)
         return {"status": "FAILED", "msg": "Pipeline failed max retries."}
         
-    # Successfully processed! Save Simplified
     simplified_text_to_save = pipeline_result["simplified_text"]
     
-    # Format Quizzes
     quizzes = []
     for q_data in pipeline_result["quiz_data"]:
         quiz = {
@@ -426,7 +291,85 @@ async def ingest_rss_feed():
             })
         quizzes.append(quiz)
     
-    # Construct complete document
+    # Pre-translate payloads
+    translations = {"hi": {}, "ta": {}}
+    from deep_translator import GoogleTranslator
+    try:
+        genre_val = pipeline_result.get("genre", "General")
+        texts_to_translate = [headline, simplified_text_to_save, raw_text, genre_val]
+        
+        quiz_refs = []
+        for q_idx, q in enumerate(quizzes):
+            texts_to_translate.append(q["question_text"])
+            quiz_refs.append({"type": "q", "q_idx": q_idx})
+            for a_idx, a in enumerate(q["answers"]):
+                texts_to_translate.append(a["answer_text"])
+                quiz_refs.append({"type": "a", "q_idx": q_idx, "a_idx": a_idx})
+                
+        for t_lang in ["hi", "ta"]:
+            translator_client = GoogleTranslator(source='en', target=t_lang)
+            
+            async def safe_translate(texts):
+                translated_results = []
+                for text_item in texts:
+                    text_str = str(text_item) if text_item else ""
+                    if not text_str:
+                        translated_results.append("")
+                        continue
+                    chunk_size = 4800
+                    chunks = [text_str[j:j+chunk_size] for j in range(0, len(text_str), chunk_size)]
+                    stitched_translation = ""
+                    for chunk in chunks:
+                        t_res = None
+                        max_retries = 3
+                        for attempt in range(max_retries):
+                            try:
+                                t_res = await asyncio.to_thread(translator_client.translate, chunk)
+                                break
+                            except Exception as err:
+                                err_str = str(err).lower()
+                                if "try another translator" in err_str or "length" in err_str or "429" in err_str:
+                                    print(f"API Block/Limit on attempt {attempt+1} for {t_lang}: {err}")
+                                    if attempt < max_retries - 1:
+                                        await asyncio.sleep(2 * (attempt + 1))
+                                else:
+                                    print(f"Translation error for {t_lang}: {err}")
+                                    break
+                        
+                        if t_res:
+                            stitched_translation += t_res
+                        else:
+                            print(f"Fallback triggered for {t_lang} chunk due to API failures. Aborting translation.")
+                            return None
+                            
+                        await asyncio.sleep(0.3)
+                    translated_results.append(stitched_translation)
+                return translated_results
+                
+            t_array = await safe_translate(texts_to_translate)
+            
+            if t_array and len(t_array) >= 4:
+                translations[t_lang]["headline"] = t_array[0]
+                translations[t_lang]["simplified_text"] = t_array[1]
+                translations[t_lang]["original_text"] = t_array[2]
+                translations[t_lang]["genre"] = t_array[3]
+                translations[t_lang]["is_available"] = True
+                
+                translated_quizzes = copy.deepcopy(quizzes)
+                offset = 4
+                for ref in quiz_refs:
+                    if offset < len(t_array):
+                        if ref["type"] == "q":
+                            translated_quizzes[ref["q_idx"]]["question_text"] = t_array[offset]
+                        elif ref["type"] == "a":
+                            translated_quizzes[ref["q_idx"]]["answers"][ref["a_idx"]]["answer_text"] = t_array[offset]
+                    offset += 1
+                translations[t_lang]["quizzes"] = translated_quizzes
+            else:
+                translations[t_lang] = {"is_available": False}
+    except Exception as e:
+        print(f"Error pre-translating article: {e}")
+
     success_doc = {
         "original": {
             "source_url": url,
@@ -447,9 +390,76 @@ async def ingest_rss_feed():
             "failure_reason": pipeline_result["fact_result"]["failure_reason"]
         },
         "quizzes": quizzes,
+        "translations": translations,
         "created_at": datetime.now().isoformat()
     }
     
     await articles_collection.insert_one(success_doc)
-    
     return {"status": "SUCCESS", "msg": f"Ingested & Processed: {headline[:30]}..."}
+
+async def ingest_rss_feed():
+    """
+    Pulls a real live RSS feed URL.
+    Fetches MULTIPLE unprocessed articles per run (Batch Processing).
+    """
+    target_feed = random.choice(LIVE_RSS_FEEDS)
+    print(f"Fetching live RSS feed: {target_feed}")
+    
+    if "hindi" in target_feed.lower():
+        print(f"Skipping feed: {target_feed} - contains 'hindi'")
+        return {"status": "SKIPPED", "msg": "Hindi feed excluded."}
+    
+    try:
+        parsed_feed = feedparser.parse(target_feed)
+    except Exception as e:
+        return {"status": "FAILED", "msg": f"Feed parsing failed: {e}"}
+    
+    feed_title = parsed_feed.feed.get("title", "").lower()
+    if "hindi" in feed_title:
+        print(f"Skipping feed: {target_feed} - feed title contains 'hindi': {feed_title}")
+        return {"status": "SKIPPED", "msg": f"Feed is Hindi: {feed_title}"}
+    
+    if not parsed_feed.entries:
+        return {"status": "FAILED", "msg": "No entries found in RSS feed."}
+        
+    print(f"Found {len(parsed_feed.entries)} entries in feed.")
+    
+    # Process up to 3 new articles per run to increase throughput
+    MAX_ARTICLES_PER_RUN = 3
+    processed_count = 0
+    results = []
+    
+    for item in parsed_feed.entries:
+        if processed_count >= MAX_ARTICLES_PER_RUN:
+            break
+            
+        link = item.get("link", "")
+        # Check if already processed
+        existing = await articles_collection.find_one({"original.source_url": link})
+        if existing:
+            continue
+            
+        print(f"Processing new article: {item.get('title', 'Unknown')}")
+        
+        # Process this single article
+        try:
+            result = await process_article_logic(item, parsed_feed)
+            results.append(result)
+            
+            # Increment count if we actually attempted separate processing (Success or Failed Pipeline)
+            # SKIPPED usually means it was filtered out quickly (e.g. language), so we should keep looking for a valid one
+            if result["status"] != "SKIPPED":
+                processed_count += 1
+            else:
+                # If skipped, we don't increment processed_count, effectively continuing to search for valid articles
+                # But to prevent infinite loops on bad feeds, we should have a safety break
+                pass
+                
+        except Exception as e:
+            print(f"Critical error processing article item: {e}")
+            results.append({"status": "ERROR", "msg": str(e)})
+            
+    if not results:
+        return {"status": "SKIPPED", "msg": "No new valid articles found to process in this batch."}
+        
+    return {"status": "BATCH_COMPLETE", "processed": processed_count, "results": results}

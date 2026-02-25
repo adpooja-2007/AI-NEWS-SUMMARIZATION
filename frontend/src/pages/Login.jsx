@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useLanguage } from '../context/LanguageContext';
 import { FiMail, FiLock, FiAlertCircle, FiArrowRight } from 'react-icons/fi';
 
 export const Login = () => {
@@ -10,6 +11,7 @@ export const Login = () => {
     const [loading, setLoading] = useState(false);
 
     const { login } = useAuth();
+    const { t } = useLanguage();
     const navigate = useNavigate();
 
     const handleSubmit = async (e) => {
@@ -35,8 +37,8 @@ export const Login = () => {
                 <div className="absolute -bottom-32 -left-32 w-64 h-64 bg-brand-gradient-2/20 rounded-full blur-3xl pointer-events-none"></div>
 
                 <div className="relative z-10 text-center mb-8">
-                    <h2 className="text-3xl font-bold bg-gradient-to-r from-brand-gradient-1 to-brand-gradient-2 bg-clip-text text-transparent mb-2">Welcome Back</h2>
-                    <p className="text-text-muted">Sign in to sync your progress and quizzes.</p>
+                    <h2 className="text-3xl font-bold bg-gradient-to-r from-brand-gradient-1 to-brand-gradient-2 bg-clip-text text-transparent mb-2">{t('welcomeBack')}</h2>
+                    <p className="text-text-muted">{t('signInToContinue')}</p>
                 </div>
 
                 {error && (
@@ -48,7 +50,7 @@ export const Login = () => {
 
                 <form onSubmit={handleSubmit} className="space-y-5">
                     <div className="space-y-1">
-                        <label className="text-sm font-medium text-text-main ml-1">Email Address</label>
+                        <label className="text-sm font-medium text-text-main ml-1">{t('emailAddress')}</label>
                         <div className="relative">
                             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-text-muted">
                                 <FiMail className="w-5 h-5" />
@@ -65,7 +67,7 @@ export const Login = () => {
                     </div>
 
                     <div className="space-y-1">
-                        <label className="text-sm font-medium text-text-main ml-1">Password</label>
+                        <label className="text-sm font-medium text-text-main ml-1">{t('password')}</label>
                         <div className="relative">
                             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-text-muted">
                                 <FiLock className="w-5 h-5" />
@@ -88,7 +90,7 @@ export const Login = () => {
                     >
                         {loading ? 'Authenticating...' : (
                             <>
-                                Sign In
+                                {t('signIn')}
                                 <FiArrowRight className="ml-2 w-4 h-4 group-hover:translate-x-1 transition-transform" />
                             </>
                         )}
@@ -96,9 +98,9 @@ export const Login = () => {
                 </form>
 
                 <p className="mt-8 text-center text-sm text-text-muted relative z-10">
-                    Don't have an account?{' '}
+                    {t('dontHaveAccount')}{' '}
                     <Link to="/signup" className="text-brand-primary hover:text-brand-gradient-2 font-medium transition-colors">
-                        Create one now
+                        {t('signUphref')}
                     </Link>
                 </p>
             </div>

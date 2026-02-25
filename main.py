@@ -8,6 +8,8 @@ import os
 from database import get_db, ArticleSimplified, Metric, Quiz, QuizAnswer, ArticleOriginal, FactVerificationLog
 from services.ingestion import ingest_rss_feed
 import database
+from deep_translator import GoogleTranslator
+import asyncio
 
 app = FastAPI(title="AI Simplified News Platform API")
 
@@ -28,7 +30,7 @@ async def scheduled_ingestion():
 
 @app.on_event("startup")
 def startup_event():
-    scheduler.add_job(scheduled_ingestion, "interval", minutes=2)
+    scheduler.add_job(scheduled_ingestion, "interval", minutes=5, max_instances=2)
     scheduler.start()
 
 @app.on_event("shutdown")
@@ -67,30 +69,86 @@ from mongodb import articles_collection, item_helper
 from auth import get_current_user
 
 @app.get("/api/articles")
-async def get_articles(current_user: dict = Depends(get_current_user)):
-    """API: Return feed of simplified articles"""
-    # Fetch all articles that passed processing
-    cursor = articles_collection.find({"processing_status": "PASS"}).sort("_id", -1)
-    articles = await cursor.to_list(length=100)
+async def get_articles(
+    lang: str = "en", 
+    page: int = 1, 
+    limit: int = 12, 
+    search: str = "",
+    genre: str = "All",
+    current_user: dict = Depends(get_current_user)
+):
+    """API: Return feed of simplified articles with pagination and filtering"""
+    # Base query for passed articles
+    query = {"processing_status": "PASS"}
+    
+    if search:
+        # Case-insensitive regex match on the headline
+        query["simplified_headline"] = {"$regex": search, "$options": "i"}
+        
+    if genre and genre != "All":
+        query["genre"] = genre
+    
+    # Calculate total matching documents
+    total_articles = await articles_collection.count_documents(query)
+    total_pages = max(1, (total_articles + limit - 1) // limit)
+    
+    # Enforce safe bounds
+    safe_page = max(1, min(page, total_pages))
+    skip = (safe_page - 1) * limit
+    
+    # Fetch paginated articles
+    cursor = articles_collection.find(query).sort("_id", -1).skip(skip).limit(limit)
+    articles = await cursor.to_list(length=limit)
     
     result = []
     for art in articles:
-        art = item_helper(art)
+        headline = art.get("simplified_headline", "Headline missing")
+        genre = art.get("genre", "General")
+        
+        is_available = True
+        if lang.lower() in ["hi", "ta"]:
+            trans = art.get("translations", {}).get(lang.lower())
+            if trans:
+                # If explicit False, then it failed. If missing, assume True (old records)
+                if trans.get("is_available") is False:
+                    is_available = False
+                else:
+                    headline = trans.get("headline", headline)
+                    genre = trans.get("genre", genre)
+                
         result.append({
-            "id": art["id"],
-            "headline": art.get("simplified_headline", ""),
+            "id": str(art.get("_id")),
+            "headline": headline,
             "publisher_name": art.get("original", {}).get("publisher_name", "Unknown"),
             "date": art.get("original", {}).get("published_date", "Unknown")[:10],
             "read_time_min": max(1, round(art.get("word_count", 0) / 150)),
             "readability_score": art.get("readability_score", 0),
-            "genre": art.get("genre", "General")
+            "genre": genre,
+            "is_available": is_available
         })
-    return result
+        
+    return {
+        "articles": result,
+        "pagination": {
+            "total_articles": total_articles,
+            "total_pages": total_pages,
+            "current_page": safe_page,
+            "limit": limit
+        }
+    }
+
+@app.get("/api/genres")
+async def get_genres(current_user: dict = Depends(get_current_user)):
+    """API: Return a list of all unique genres currently in the database."""
+    genres = await articles_collection.distinct("genre", {"processing_status": "PASS"})
+    # Filter out empty or None genres, sort alphabetically
+    valid_genres = sorted([g for g in genres if g and isinstance(g, str)])
+    return {"genres": ["All"] + valid_genres}
 
 from bson import ObjectId
 
 @app.get("/api/articles/{article_id}")
-async def get_article_detail(article_id: str, current_user: dict = Depends(get_current_user)):
+async def get_article_detail(article_id: str, lang: str = "en", current_user: dict = Depends(get_current_user)):
     """API: Return full article detail, fact verification, and quizzes"""
     try:
         obj_id = ObjectId(article_id)
@@ -122,6 +180,29 @@ async def get_article_detail(article_id: str, current_user: dict = Depends(get_c
         "matched_entities": article.get("fact_verification", {}).get("matched_entities_count", 0),
         "quizzes": formatted_quizzes
     }
+    
+    response_data["is_available"] = True
+    
+    if lang.lower() in ["hi", "ta"]:
+        trans = article.get("translations", {}).get(lang.lower())
+        if trans:
+            if trans.get("is_available") is False:
+                response_data["is_available"] = False
+            else:
+                response_data["headline"] = trans.get("headline", response_data["headline"])
+                response_data["simplified_text"] = trans.get("simplified_text", response_data["simplified_text"])
+                response_data["original_text"] = trans.get("original_text", response_data["original_text"])
+                
+                # Map translated quizzes
+                if "quizzes" in trans and trans["quizzes"]:
+                    translated_quizzes = []
+                    for q in trans["quizzes"]:
+                        translated_quizzes.append({
+                            "id": str(q.get("id", "")),
+                            "question_text": q.get("question_text", ""),
+                            "answers": [{"id": str(a.get("id", "")), "text": a.get("answer_text", "")} for a in q.get("answers", [])]
+                        })
+                    response_data["quizzes"] = translated_quizzes
     
     return response_data
 
@@ -210,7 +291,7 @@ async def record_article_view(article_id: str, current_user: dict = Depends(get_
     return {"status": "success"}
 
 @app.get("/api/user/stats")
-async def get_user_stats(current_user: dict = Depends(get_current_user)):
+async def get_user_stats(lang: str = "en", current_user: dict = Depends(get_current_user)):
     """API: Get personalized dashboard metrics"""
     user_id = current_user["id"]
     
@@ -249,34 +330,50 @@ async def get_user_stats(current_user: dict = Depends(get_current_user)):
             
     global_total = await articles_collection.count_documents({"processing_status": "PASS"})
     
-    # Build Reading History (limit 15 unique articles)
+    # Build Reading History (limit 5 unique articles)
     reading_history = []
     seen_articles_history = set()
     for m in view_metrics:
         aid = m.get("article_id")
         if aid not in seen_articles_history and aid in article_headlines:
+            headline = article_headlines[aid]
+            if lang.lower() in ["hi", "ta"]:
+                art_doc = next((a for a in all_articles if str(a.get("_id")) == aid), None)
+                if art_doc:
+                    trans = art_doc.get("translations", {}).get(lang.lower())
+                    if trans:
+                        headline = trans.get("headline", headline)
+                        
             reading_history.append({
                 "article_id": aid,
-                "headline": article_headlines[aid],
+                "headline": headline,
                 "date": m.get("created_at")
             })
             seen_articles_history.add(aid)
-            if len(reading_history) >= 15:
+            if len(reading_history) >= 5:
                 break
                 
-    # Build Quiz History (limit 15 recent quizzes)
+    # Build Quiz History (limit 5 recent quizzes)
     quiz_history = []
     for m in quiz_metrics:
         aid = m.get("article_id")
+        headline = article_headlines.get(aid, "Unknown Article")
+        if aid and lang.lower() in ["hi", "ta"]:
+            art_doc = next((a for a in all_articles if str(a.get("_id")) == aid), None)
+            if art_doc:
+                trans = art_doc.get("translations", {}).get(lang.lower())
+                if trans:
+                    headline = trans.get("headline", headline)
+
         quiz_history.append({
             "article_id": aid,
-            "headline": article_headlines.get(aid, "Unknown Article"),
+            "headline": headline,
             "score": m.get("quiz_score_pct", 0),
             "date": m.get("created_at")
         })
-        if len(quiz_history) >= 15:
+        if len(quiz_history) >= 5:
             break
-    
+            
     return {
         "articles_read": total_articles_read,
         "global_total_articles": global_total,

@@ -1,54 +1,95 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Newspaper, ChevronRight, Clock, ShieldCheck, Search, CalendarDays, RefreshCw } from 'lucide-react'
+import { Newspaper, ChevronRight, Clock, ShieldCheck, Search, CalendarDays, RefreshCw, FolderOpen, AlertCircle, XCircle } from 'lucide-react'
+import { useAuth } from '../context/AuthContext'
+import { useLanguage } from '../context/LanguageContext'
 
 export default function Feed() {
     const [articles, setArticles] = useState([])
     const [loading, setLoading] = useState(true)
     const [searchQuery, setSearchQuery] = useState('')
     const [selectedGenre, setSelectedGenre] = useState('All')
+    const [currentPage, setCurrentPage] = useState(1)
+    const [totalPages, setTotalPages] = useState(1)
     const [serverOffline, setServerOffline] = useState(false)
+    const [uniqueGenres, setUniqueGenres] = useState(['All'])
+    const { user } = useAuth()
+    const { t, language } = useLanguage()
 
     useEffect(() => {
         fetchArticles()
-    }, [])
+    }, [language, currentPage])
 
     const fetchArticles = () => {
         setLoading(true)
         setServerOffline(false)
         const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8001'
         const token = localStorage.getItem('token')
+        const limit = 12 // Matches backend default, or could be adjusted
 
-        fetch(`${baseUrl}/api/articles`, {
+        // Build the query string dynamically
+        const queryParams = new URLSearchParams({
+            lang: language,
+            page: currentPage,
+            limit: limit
+        })
+
+        if (searchQuery) queryParams.append('search', searchQuery)
+        if (selectedGenre !== 'All') queryParams.append('genre', selectedGenre)
+
+        fetch(`${baseUrl}/api/articles?${queryParams.toString()}`, {
             headers: { 'Authorization': `Bearer ${token}` }
         })
             .then(res => res.json())
             .then(data => {
-                setArticles(data)
+                // Handle the new paginated response format
+                const articlesData = data.articles || []
+                setArticles(articlesData)
+                setTotalPages(data.pagination ? data.pagination.total_pages : 1)
                 setLoading(false)
-                if (data.length === 0) {
+
+                if (articlesData.length === 0 && currentPage === 1) {
+                    // Only show offline warning if empty on the first page
                     setServerOffline(true)
                 }
             })
             .catch(err => {
                 console.error("Failed to fetch articles", err)
-                setServerOffline(true)
+                // Don't flag offline just for a bad page request unless it's page 1
+                if (currentPage === 1) setServerOffline(true)
                 setLoading(false)
             })
     }
+    // Fetch available genres on mount
+    useEffect(() => {
+        const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8001'
+        const token = localStorage.getItem('token')
 
-    // Default genres shown in the UI mockup if db is empty
-    const defaultGenres = ['All', 'Politics', 'Health', 'Sports', 'Education', 'Technology']
-    const uniqueGenres = articles.length > 0
-        ? ['All', ...new Set(articles.map(a => a.genre || 'General'))]
-        : defaultGenres
+        fetch(`${baseUrl}/api/genres`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        })
+            .then(res => res.json())
+            .then(data => {
+                if (data.genres) {
+                    setUniqueGenres(data.genres)
+                }
+            })
+            .catch(err => console.error("Failed to fetch genres", err))
+    }, [])
+    // Reset page to 1 when search or genre changes
+    useEffect(() => {
+        setCurrentPage(1)
+        // We need to fetch articles again when search/genre changes, so we add a specific effect for this or trigger it
+    }, [searchQuery, selectedGenre])
 
-    const filteredArticles = articles.filter(article => {
-        const matchesSearch = article.headline.toLowerCase().includes(searchQuery.toLowerCase())
-        const matchesGenre = selectedGenre === 'All' || article.genre === selectedGenre
-        return matchesSearch && matchesGenre
-    })
+    // Fetch when search or genre changes (with a slight debounce if typing)
+    useEffect(() => {
+        const timeoutId = setTimeout(() => {
+            fetchArticles()
+        }, 300)
+        return () => clearTimeout(timeoutId)
+    }, [searchQuery, selectedGenre])
 
     if (loading) {
         return (
@@ -67,38 +108,74 @@ export default function Feed() {
                     <span>{new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</span>
                 </div>
                 <h2 className="text-4xl sm:text-5xl font-extrabold tracking-tight mb-4 text-text-main">
-                    Today's <span className="bg-gradient-to-r from-brand-gradient-1 to-brand-gradient-2 bg-clip-text text-transparent">Simplified</span> News
+                    {t('todaysNews')} <span className="bg-gradient-to-r from-brand-gradient-1 to-brand-gradient-2 bg-clip-text text-transparent">{t('simplifiedNews')}</span> {t('newsSuffix')}
                 </h2>
                 <p className="text-lg text-text-muted font-medium max-w-2xl">
-                    Real-time news from across the globe, rewritten in simple language for easy understanding.
+                    {t('realTimeDesc')}
                 </p>
             </div>
 
-            {/* Search and Filter Bar */}
-            <div className="bg-bg-card p-2.5 rounded-2xl shadow-sm border border-border-main flex flex-col md:flex-row items-center justify-between gap-4 mb-8 transition-colors duration-300">
-                <div className="relative w-full md:w-1/2 flex items-center">
-                    <Search className="absolute left-4 h-5 w-5 text-text-muted" />
-                    <input
-                        type="text"
-                        placeholder="Search news articles..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="w-full pl-12 pr-4 py-3 bg-bg-hover border-none rounded-xl text-sm font-semibold focus:ring-2 focus:ring-brand-primary/50 placeholder-text-muted text-text-main transition-all"
-                    />
+            {/* Ultra-Premium Search and Filter Hero */}
+            <div className="relative z-10 mb-16 max-w-4xl mx-auto flex flex-col items-center gap-6">
+                {/* Search Input - Floating & Glowing */}
+                <div className="relative w-full group">
+                    {/* Dynamic glowing background behind the search bar */}
+                    <div className="absolute -inset-1.5 bg-gradient-to-r from-brand-gradient-1 via-brand-secondary to-brand-gradient-2 rounded-[2.5rem] blur-md opacity-20 group-focus-within:opacity-40 transition-opacity duration-500"></div>
+
+                    <div className="relative flex items-center bg-bg-card border border-border-main rounded-[2rem] shadow-2xl p-2 sm:p-3 transition-colors duration-300">
+                        <div className="pl-4 pr-2">
+                            <Search className="h-6 w-6 text-brand-primary" />
+                        </div>
+                        <input
+                            type="text"
+                            placeholder={t('searchArticles')}
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="w-full bg-transparent border-none text-lg sm:text-xl font-semibold text-text-main placeholder-text-muted/60 focus:ring-0 outline-none px-2 transition-all"
+                        />
+                        {searchQuery && (
+                            <button
+                                onClick={() => setSearchQuery('')}
+                                className="mr-4 p-2 rounded-full hover:bg-bg-hover text-text-muted hover:text-red-500 transition-colors"
+                            >
+                                <XCircle size={22} />
+                            </button>
+                        )}
+                    </div>
                 </div>
-                <div className="flex flex-wrap items-center gap-2 w-full md:w-auto overflow-x-auto pb-2 md:pb-0 hide-scrollbar">
-                    {uniqueGenres.map(genre => (
-                        <button
-                            key={genre}
-                            onClick={() => setSelectedGenre(genre)}
-                            className={`px-5 py-2.5 rounded-xl text-sm font-bold transition-all whitespace-nowrap ${selectedGenre === genre
-                                ? 'bg-gradient-to-r from-brand-gradient-1 to-brand-gradient-2 text-white shadow-md shadow-brand-primary/20'
-                                : 'bg-bg-hover text-text-muted hover:text-text-main border border-transparent hover:border-border-main'
-                                }`}
-                        >
-                            {genre}
-                        </button>
-                    ))}
+
+                {/* Categories - Minimalist Wrapping Pills */}
+                <div className="w-full relative">
+                    <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-3 px-2 pb-4 pt-2">
+                        {uniqueGenres.map(genre => {
+                            const isActive = selectedGenre === genre;
+                            // Remove spaces to match translation keys, e.g. "World News" -> "WorldNews"
+                            const translationKey = `genre_${genre.replace(/ /g, '')}`;
+                            const displayGenre = t(translationKey) || genre;
+
+                            return (
+                                <button
+                                    key={genre}
+                                    onClick={() => setSelectedGenre(genre)}
+                                    className={`relative px-5 py-2 sm:px-6 sm:py-2.5 rounded-full text-xs sm:text-sm font-bold transition-all duration-300
+                                        ${isActive
+                                            ? 'text-white shadow-xl shadow-brand-primary/25 scale-[1.02]'
+                                            : 'text-text-muted bg-bg-card hover:bg-bg-hover hover:text-text-main border border-border-main hover:border-brand-primary/30 shadow-sm'
+                                        }`}
+                                >
+                                    {isActive && (
+                                        <motion.div
+                                            layoutId="activeCategoryPill"
+                                            className="absolute inset-0 bg-gradient-to-r from-brand-gradient-1 to-brand-gradient-2 rounded-full -z-10"
+                                            initial={false}
+                                            transition={{ type: "spring", stiffness: 500, damping: 35 }}
+                                        />
+                                    )}
+                                    <span className="relative z-10">{displayGenre}</span>
+                                </button>
+                            );
+                        })}
+                    </div>
                 </div>
             </div>
 
@@ -123,7 +200,7 @@ export default function Feed() {
             )}
 
             {/* Content Area */}
-            {!serverOffline && filteredArticles.length === 0 ? (
+            {!serverOffline && articles.length === 0 ? (
                 <motion.div
                     initial={{ opacity: 0, scale: 0.95 }}
                     animate={{ opacity: 1, scale: 1 }}
@@ -131,12 +208,12 @@ export default function Feed() {
                 >
                     <Search size={48} className="mx-auto text-text-muted/50 mb-4" />
                     <h3 className="text-2xl font-bold text-text-main mb-2">No matches found</h3>
-                    <p className="text-lg">Try adjusting your search terms or selecting a different genre.</p>
+                    <p className="text-lg">{t('noArticlesMatch')}</p>
                 </motion.div>
             ) : (
                 <div className="grid gap-6">
                     <AnimatePresence>
-                        {filteredArticles.map((article) => (
+                        {articles.map((article) => (
                             <motion.div
                                 key={article.id}
                                 layout
@@ -151,6 +228,11 @@ export default function Feed() {
                                     >
                                         <div className="flex-1">
                                             <div className="flex flex-wrap items-center gap-4 text-sm font-bold text-text-muted mb-3">
+                                                {article.is_available === false && (
+                                                    <span className="flex items-center gap-1.5 bg-red-500/10 text-red-500 px-3 py-1 rounded-full border border-red-500/20 uppercase tracking-wide text-xs transition-colors">
+                                                        <AlertCircle size={14} /> {t('translationUnavailable')}
+                                                    </span>
+                                                )}
                                                 <span className="flex items-center gap-1.5 bg-brand-secondary text-brand-primary px-3 py-1 rounded-full border border-brand-primary/20 uppercase tracking-wide text-xs transition-colors">
                                                     {article.genre || 'General'}
                                                 </span>
@@ -158,10 +240,10 @@ export default function Feed() {
                                                     📅 {article.date}
                                                 </span>
                                                 <span className="flex items-center gap-1.5 bg-bg-hover px-3 py-1 rounded-full border border-border-main transition-colors">
-                                                    <Clock size={16} /> ~{article.read_time_min} min read
+                                                    <Clock size={16} /> ~{article.read_time_min} {t('minRead')}
                                                 </span>
                                                 <span className="flex items-center gap-1.5 bg-green-500/10 text-green-500 px-3 py-1 rounded-full border border-green-500/20 transition-colors">
-                                                    <ShieldCheck size={16} /> Grade {article.readability_score.toFixed(1)}
+                                                    <ShieldCheck size={16} /> {t('grade')} {article.readability_score.toFixed(1)}
                                                 </span>
                                             </div>
                                             <h3 className="text-2xl font-bold text-text-main leading-snug group-hover:text-brand-primary transition-colors">
@@ -176,6 +258,35 @@ export default function Feed() {
                             </motion.div>
                         ))}
                     </AnimatePresence>
+                </div>
+            )}
+
+            {/* Pagination Controls */}
+            {!serverOffline && totalPages > 1 && (
+                <div className="flex items-center justify-center gap-4 mt-12 bg-bg-card border border-border-main p-4 rounded-2xl mx-auto w-fit transition-colors duration-300">
+                    <button
+                        onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                        disabled={currentPage === 1 || loading}
+                        className={`px-5 py-2.5 rounded-xl text-sm font-bold transition-all ${currentPage === 1 || loading
+                            ? 'opacity-50 cursor-not-allowed bg-bg-hover text-text-muted'
+                            : 'bg-brand-primary text-white hover:shadow-lg shadow-brand-primary/20'
+                            }`}
+                    >
+                        Previous
+                    </button>
+                    <span className="text-text-main font-semibold px-4">
+                        Page {currentPage} of {totalPages}
+                    </span>
+                    <button
+                        onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                        disabled={currentPage === totalPages || loading}
+                        className={`px-5 py-2.5 rounded-xl text-sm font-bold transition-all ${currentPage === totalPages || loading
+                            ? 'opacity-50 cursor-not-allowed bg-bg-hover text-text-muted'
+                            : 'bg-brand-primary text-white hover:shadow-lg shadow-brand-primary/20'
+                            }`}
+                    >
+                        Next
+                    </button>
                 </div>
             )}
         </div>
