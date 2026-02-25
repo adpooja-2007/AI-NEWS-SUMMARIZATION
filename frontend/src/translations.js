@@ -22,6 +22,8 @@ export const translations = {
         translationUnavailable: "Not available in this language",
 
         // Detail
+        listenAudio: "Listen to Article",
+        stopAudio: "Stop Audio",
         backToFeed: "Back to feed",
         originalSource: "Original Source",
         timeToRead: "Time to Read",
@@ -100,6 +102,8 @@ export const translations = {
         loadingArticles: "लेख लोड हो रहे हैं...",
         translationUnavailable: "इस भाषा में उपलब्ध नहीं है",
 
+        listenAudio: "लेख सुनें",
+        stopAudio: "ऑडियो रोकें",
         backToFeed: "फ़ीड पर वापस",
         originalSource: "मूल स्रोत",
         timeToRead: "पढ़ने का समय",
@@ -176,6 +180,8 @@ export const translations = {
         loadingArticles: "கட்டுரைகள் ஏற்றப்படுகின்றன...",
         translationUnavailable: "இந்த மொழியில் கிடைக்கவில்லை",
 
+        listenAudio: "கட்டுரையைக் கேளுங்கள்",
+        stopAudio: "ஆடியோவை நிறுத்து",
         backToFeed: "செய்தியோடைக்கு திரும்பு",
         originalSource: "மூல ஆதாரம்",
         timeToRead: "வாசிக்கும் நேரம்",

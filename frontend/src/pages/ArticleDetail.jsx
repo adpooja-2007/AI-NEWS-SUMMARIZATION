@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ArrowLeft, ShieldCheck, AlertTriangle, ChevronDown, ChevronUp, BookOpen, Clock, CheckCircle, Brain, ExternalLink, Trophy } from 'lucide-react'
+import { ArrowLeft, ShieldCheck, AlertTriangle, ChevronDown, ChevronUp, BookOpen, Clock, CheckCircle, Brain, ExternalLink, Trophy, Volume2, Square } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { useLanguage } from '../context/LanguageContext'
 
@@ -12,7 +12,10 @@ export default function ArticleDetail() {
     const [answers, setAnswers] = useState({})
     const [quizResult, setQuizResult] = useState(null)
     const [showOriginal, setShowOriginal] = useState(false)
-
+    const [isSpeaking, setIsSpeaking] = useState(false)
+    const [audioElement, setAudioElement] = useState(null)
+    const isSpeakingRef = useRef(false)
+    const currentAudioRef = useRef(null)
     const { user } = useAuth()
     const { t, language } = useLanguage()
 
@@ -39,7 +42,110 @@ export default function ArticleDetail() {
             headers: { 'Authorization': `Bearer ${token}` }
         }).catch(err => console.error("Failed to record view", err))
 
-    }, [id, language])
+        return () => {
+            // Clean up audio if component unmounts while playing
+            if (currentAudioRef.current) {
+                currentAudioRef.current.pause()
+                currentAudioRef.current.src = ''
+            }
+        }
+    }, [id, language, audioElement])
+
+    // Handle Cloud Text-To-Speech via Zero-Latency Sentence Chunking
+    const toggleSpeech = async () => {
+        if (!article) return
+
+        if (isSpeaking) {
+            // Stop playback completely if already playing
+            isSpeakingRef.current = false
+            setIsSpeaking(false)
+            if (currentAudioRef.current) {
+                currentAudioRef.current.pause()
+                currentAudioRef.current.src = ''
+            }
+            return
+        }
+
+        isSpeakingRef.current = true
+        setIsSpeaking(true)
+
+        const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8001'
+        const token = localStorage.getItem('token')
+
+        // Ensure we are reading the correct language text
+        let textToRead = article.simplified_text
+        if ((language === 'hi' || language === 'ta') && article.translations && article.translations[language]) {
+            textToRead = article.translations[language].simplified_text
+        }
+
+        // Split paragraph into distinct sentences using periods, question marks, and Hindi/Tamil full stops (। ॥)
+        const rawChunks = textToRead.match(/[^.!?।॥\n]+[.!?।॥\n]+/g) || [textToRead]
+        const validChunks = rawChunks.map(c => c.trim()).filter(c => c.length > 1)
+
+        if (validChunks.length === 0) {
+            isSpeakingRef.current = false
+            setIsSpeaking(false)
+            return
+        }
+
+        const preloadedBlobs = new Map()
+
+        const fetchSnippet = async (index, text) => {
+            if (preloadedBlobs.has(index)) return preloadedBlobs.get(index)
+            try {
+                const response = await fetch(`${baseUrl}/api/tts/snippet`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text, lang: language })
+                })
+                if (!response.ok) throw new Error("Snippet API failed")
+                const blob = await response.blob()
+                preloadedBlobs.set(index, blob)
+                return blob
+            } catch (err) {
+                console.error("Failed to fetch audio snippet", err)
+                return null
+            }
+        }
+
+        for (let i = 0; i < validChunks.length; i++) {
+            if (!isSpeakingRef.current) break // Abort if user pressed Stop
+
+            // Instantly start pre-fetching the NEXT sentence's audio in the background
+            if (i + 1 < validChunks.length) {
+                fetchSnippet(i + 1, validChunks[i + 1]).catch(() => { })
+            }
+
+            const blob = await fetchSnippet(i, validChunks[i])
+            if (!blob || !isSpeakingRef.current) break
+
+            const objectUrl = URL.createObjectURL(blob)
+            const newAudio = new Audio(objectUrl)
+            currentAudioRef.current = newAudio
+
+            await new Promise((resolve) => {
+                newAudio.onended = () => {
+                    URL.revokeObjectURL(objectUrl)
+                    resolve()
+                }
+                newAudio.onerror = (e) => {
+                    console.error("Cloud TTS Playback Error:", e)
+                    URL.revokeObjectURL(objectUrl)
+                    resolve() // Skip to next sentence on failure rather than hard-crashing
+                }
+                newAudio.play().catch(err => {
+                    console.error("Autoplay prevented:", err)
+                    isSpeakingRef.current = false // Hard abort playback if browser strict-blocks audio
+                    resolve()
+                })
+            })
+        }
+
+        // Reset state once sequence ends naturally or is aborted
+        isSpeakingRef.current = false
+        setIsSpeaking(false)
+        currentAudioRef.current = null
+    }
 
     const handleSelectAnswer = (quizId, answerId) => {
         setAnswers(prev => ({ ...prev, [quizId]: answerId }))
@@ -111,7 +217,38 @@ export default function ArticleDetail() {
                     )}
                 </div>
 
-                <div className="prose prose-lg max-w-none text-xl leading-relaxed text-text-main mb-16">
+                {/* TTS Play Button */}
+                <div className="flex items-center gap-4 mb-8">
+                    <button
+                        onClick={toggleSpeech}
+                        className={`flex items-center gap-2 px-6 py-3 rounded-full font-bold transition-all shadow-sm ${isSpeaking
+                            ? 'bg-red-500 hover:bg-red-600 text-white shadow-red-500/20'
+                            : 'bg-brand-primary hover:bg-brand-secondary text-white shadow-brand-primary/20'
+                            }`}
+                    >
+                        {isSpeaking ? (
+                            <>
+                                <Square size={20} className="fill-current" />
+                                {t('stopAudio')}
+                            </>
+                        ) : (
+                            <>
+                                <Volume2 size={20} />
+                                {t('listenAudio')}
+                            </>
+                        )}
+                    </button>
+                    {!isSpeaking && (
+                        <p className="text-text-muted text-sm font-medium">
+                            {t('readSilently')}
+                        </p>
+                    )}
+                </div>
+
+                <div className="prose prose-lg max-w-none text-xl leading-relaxed text-text-main mb-16 relative">
+                    {isSpeaking && (
+                        <div className="absolute -left-4 top-0 bottom-0 w-1 bg-gradient-to-b from-brand-primary to-brand-secondary rounded-full hidden sm:block"></div>
+                    )}
                     <p>{article.simplified_text}</p>
                 </div>
 

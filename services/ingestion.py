@@ -35,24 +35,50 @@ def clean_html(raw_html):
     return text.strip()
 
 def fetch_full_article_text(url):
-    """Scrapes the full article body from the source URL - NO FILTERING."""
+    """Scrapes the full article body from the source URL intelligently while ignoring noise."""
     try:
-        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'})
-        html = urllib.request.urlopen(req, timeout=15).read()
-        soup = BeautifulSoup(html, "html.parser")
+        import requests
+        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'}
+        response = requests.get(url, headers=headers, timeout=15)
+        soup = BeautifulSoup(response.text, "html.parser")
         
-        # Get ALL paragraphs - NO LENGTH FILTERING
-        paragraphs = soup.find_all('p')
+        # Actively destroy noise elements before parsing
+        for noise in soup.find_all(['nav', 'footer', 'header', 'aside']):
+            noise.decompose()
+            
+        # Destroy elements with common noise classes
+        for noise in soup.find_all(class_=lambda x: x and any(word in x.lower() for word in ['menu', 'sidebar', 'cookie', 'popup', 'newsletter', 'sponsor'])):
+            noise.decompose()
+
+        article_tags = soup.find_all('article') or soup.find_all(role='main') or soup.find_all('main')
+        extracted_text = ""
         
-        # Also try article-specific tags
-        article_body = soup.find('article') or soup.find('main') or soup.find('div', {'id': 'content'}) or soup.find('div', class_=lambda x: x and ('article' in x.lower() or 'content' in x.lower() or 'story' in x.lower() if x else False))
-        if article_body:
-            paragraphs.extend(article_body.find_all(['p', 'div', 'span']))
+        def is_boilerplate(text):
+            junk_phrases = [
+                "published -", "comments have to be in english",
+                "abide by our community guidelines", "migrated to a new commenting platform",
+                "registered user of the hindu", "access their older comments", "vuukle",
+                "copyright", "all rights reserved", "subscribe to our newsletter"
+            ]
+            t_lower = text.lower()
+            return any(phrase in t_lower for phrase in junk_phrases)
+
+        if article_tags:
+            for tag in article_tags:
+                for p in tag.find_all('p'):
+                    p_text = p.get_text(strip=True)
+                    if len(p_text) > 20 and not is_boilerplate(p_text):
+                        extracted_text += p_text + "\n"
+        else:
+            # Fallback
+            main_content = soup.find('div', {'id': 'content'}) or soup.find('div', {'class': 'article-body'}) or soup.find('body')
+            if main_content:
+                for p in main_content.find_all('p'):
+                    p_text = p.get_text(separator=' ', strip=True)
+                    if len(p_text) > 30 and not is_boilerplate(p_text):
+                        extracted_text += p_text + "\n"
         
-        # Get text from ALL paragraphs - NO FILTERING
-        text = ' '.join([p.get_text(separator=' ', strip=True) for p in paragraphs if p.get_text(strip=True)])
-        
-        return text if text else ""
+        return extracted_text.strip()
     except Exception as e:
         print(f"Failed to fetch full article {url}: {e}")
         return ""
@@ -231,21 +257,47 @@ async def process_article_logic(article_data, parsed_feed):
         print(f"Skipping article '{headline}' - language is {detected_lang}, not English")
         return {"status": "SKIPPED", "msg": f"Article is in {detected_lang}, only English articles are processed."}
     
-    # If text is too short, try to fetch more aggressively
+    # If text is too short, try to fetch more aggressively using smart HTML parsing
     if len(raw_text) < 100:
         if not full_text or len(full_text) < 100:
             try:
-                req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'})
-                html = urllib.request.urlopen(req, timeout=15).read()
-                soup = BeautifulSoup(html, "html.parser")
-                main_content = soup.find('main') or soup.find('div', {'id': 'content'}) or soup.find('div', {'class': 'article-body'})
-                if main_content:
-                    paragraphs = main_content.find_all(['p', 'div'])
-                    additional_text = ' '.join([p.get_text(separator=' ', strip=True) for p in paragraphs if len(p.get_text(strip=True)) > 30])
-                    if len(additional_text) > len(raw_text):
-                        raw_text = additional_text
-            except:
-                pass
+                import requests
+                headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'}
+                response = requests.get(url, headers=headers, timeout=15)
+                soup = BeautifulSoup(response.text, "html.parser")
+                
+                article_tags = soup.find_all('article') or soup.find_all(role='main') or soup.find_all('main')
+                extracted_text = ""
+                
+                def is_boilerplate(text):
+                    junk_phrases = [
+                        "published -", "comments have to be in english",
+                        "abide by our community guidelines", "migrated to a new commenting platform",
+                        "registered user of the hindu", "access their older comments", "vuukle",
+                        "copyright", "all rights reserved", "subscribe to our newsletter"
+                    ]
+                    t_lower = text.lower()
+                    return any(phrase in t_lower for phrase in junk_phrases)
+                
+                if article_tags:
+                    for tag in article_tags:
+                        for p in tag.find_all('p'):
+                            p_text = p.get_text(strip=True)
+                            if len(p_text) > 20 and not is_boilerplate(p_text):
+                                extracted_text += p_text + "\n"
+                else:
+                    # Fallback
+                    main_content = soup.find('div', {'id': 'content'}) or soup.find('div', {'class': 'article-body'})
+                    if main_content:
+                        for p in main_content.find_all(['p', 'div']):
+                            p_text = p.get_text(strip=True)
+                            if len(p_text) > 30 and not is_boilerplate(p_text):
+                                extracted_text += p_text + "\n"
+                
+                if len(extracted_text) > len(raw_text):
+                    raw_text = extracted_text
+            except Exception as e:
+                print(f"Aggressive parsing failed: {e}")
         
         if len(raw_text) < 100:
             print(f"Skipping article '{headline}' - insufficient content (only {len(raw_text)} chars)")
@@ -324,8 +376,15 @@ async def process_article_logic(article_data, parsed_feed):
                         max_retries = 3
                         for attempt in range(max_retries):
                             try:
-                                t_res = await asyncio.to_thread(translator_client.translate, chunk)
+                                t_res = await asyncio.wait_for(asyncio.to_thread(translator_client.translate, chunk), timeout=15.0)
                                 break
+                            except (asyncio.TimeoutError, TimeoutError):
+                                print(f"Timeout on attempt {attempt+1} for {t_lang}")
+                                if attempt < max_retries - 1:
+                                    await asyncio.sleep(2 * (attempt + 1))
+                            except asyncio.CancelledError:
+                                print(f"Task cancelled during translation for {t_lang}. Aborting.")
+                                return None
                             except Exception as err:
                                 err_str = str(err).lower()
                                 if "try another translator" in err_str or "length" in err_str or "429" in err_str:
@@ -402,64 +461,75 @@ async def ingest_rss_feed():
     Pulls a real live RSS feed URL.
     Fetches MULTIPLE unprocessed articles per run (Batch Processing).
     """
-    target_feed = random.choice(LIVE_RSS_FEEDS)
-    print(f"Fetching live RSS feed: {target_feed}")
-    
-    if "hindi" in target_feed.lower():
-        print(f"Skipping feed: {target_feed} - contains 'hindi'")
-        return {"status": "SKIPPED", "msg": "Hindi feed excluded."}
-    
-    try:
-        parsed_feed = feedparser.parse(target_feed)
-    except Exception as e:
-        return {"status": "FAILED", "msg": f"Feed parsing failed: {e}"}
-    
-    feed_title = parsed_feed.feed.get("title", "").lower()
-    if "hindi" in feed_title:
-        print(f"Skipping feed: {target_feed} - feed title contains 'hindi': {feed_title}")
-        return {"status": "SKIPPED", "msg": f"Feed is Hindi: {feed_title}"}
-    
-    if not parsed_feed.entries:
-        return {"status": "FAILED", "msg": "No entries found in RSS feed."}
-        
-    print(f"Found {len(parsed_feed.entries)} entries in feed.")
-    
-    # Process up to 3 new articles per run to increase throughput
+    # Process up to 3 NEW successfully ingested articles per run to increase throughput
     MAX_ARTICLES_PER_RUN = 3
     processed_count = 0
+    successful_insertions = 0
+    skipped_existing = 0
     results = []
     
-    for item in parsed_feed.entries:
-        if processed_count >= MAX_ARTICLES_PER_RUN:
+    feeds_to_try = list(LIVE_RSS_FEEDS)
+    random.shuffle(feeds_to_try)
+    
+    for target_feed in feeds_to_try:
+        if successful_insertions >= MAX_ARTICLES_PER_RUN:
             break
             
-        link = item.get("link", "")
-        # Check if already processed
-        existing = await articles_collection.find_one({"original.source_url": link})
-        if existing:
+        print(f"Fetching live RSS feed: {target_feed}")
+        
+        if "hindi" in target_feed.lower():
+            print(f"Skipping feed: {target_feed} - contains 'hindi'")
+            continue
+        
+        try:
+            parsed_feed = feedparser.parse(target_feed)
+        except Exception as e:
+            print(f"Feed parsing failed for {target_feed}: {e}")
+            continue
+        
+        feed_title = parsed_feed.feed.get("title", "").lower()
+        if "hindi" in feed_title:
+            print(f"Skipping feed: {target_feed} - feed title contains 'hindi': {feed_title}")
+            continue
+        
+        if not parsed_feed.entries:
+            print(f"No entries found in RSS feed: {target_feed}")
             continue
             
-        print(f"Processing new article: {item.get('title', 'Unknown')}")
+        print(f"Found {len(parsed_feed.entries)} entries in feed: {target_feed}")
         
-        # Process this single article
-        try:
-            result = await process_article_logic(item, parsed_feed)
-            results.append(result)
-            
-            # Increment count if we actually attempted separate processing (Success or Failed Pipeline)
-            # SKIPPED usually means it was filtered out quickly (e.g. language), so we should keep looking for a valid one
-            if result["status"] != "SKIPPED":
-                processed_count += 1
-            else:
-                # If skipped, we don't increment processed_count, effectively continuing to search for valid articles
-                # But to prevent infinite loops on bad feeds, we should have a safety break
-                pass
+        for item in parsed_feed.entries:
+            if successful_insertions >= MAX_ARTICLES_PER_RUN:
+                break
                 
-        except Exception as e:
-            print(f"Critical error processing article item: {e}")
-            results.append({"status": "ERROR", "msg": str(e)})
+            link = item.get("link", "")
+            # Check if already processed
+            existing = await articles_collection.find_one({"original.source_url": link})
+            if existing:
+                skipped_existing += 1
+                continue
+                
+            print(f"Processing new article: {item.get('title', 'Unknown')}")
+            
+            # Process this single article
+            try:
+                result = await process_article_logic(item, parsed_feed)
+                results.append(result)
+                
+                if result.get("status") == "SUCCESS":
+                    successful_insertions += 1
+                    processed_count += 1
+                elif result.get("status") != "SKIPPED":
+                    # Failed pipeline or some other error but it was processed
+                    processed_count += 1
+                    
+            except Exception as e:
+                print(f"Critical error processing article item: {e}")
+                results.append({"status": "ERROR", "msg": str(e)})
+                
+    print(f"Finished auto-ingestion cycle. Successfully Ingested: {successful_insertions}, Skipped (already in DB): {skipped_existing}")
             
     if not results:
-        return {"status": "SKIPPED", "msg": "No new valid articles found to process in this batch."}
+        return {"status": "SKIPPED", "msg": "No new valid articles found across any feeds in this batch."}
         
     return {"status": "BATCH_COMPLETE", "processed": processed_count, "results": results}

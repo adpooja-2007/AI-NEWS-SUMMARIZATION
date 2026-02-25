@@ -203,8 +203,95 @@ async def get_article_detail(article_id: str, lang: str = "en", current_user: di
                             "answers": [{"id": str(a.get("id", "")), "text": a.get("answer_text", "")} for a in q.get("answers", [])]
                         })
                     response_data["quizzes"] = translated_quizzes
-    
     return response_data
+
+import io
+import asyncio
+from fastapi.responses import StreamingResponse
+from fastapi import HTTPException
+from auth import SECRET_KEY, ALGORITHM
+from jose import jwt, JWTError
+
+@app.get("/api/tts/{article_id}")
+async def get_article_tts(article_id: str, lang: str = "en", token: str = None):
+    """API: Stream MP3 chunks of the simplified article text in the requested language"""
+    if not token:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        username: str = payload.get("sub")
+        if username is None:
+            raise HTTPException(status_code=401, detail="Invalid token")
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    try:
+        obj_id = ObjectId(article_id)
+    except:
+        return {"error": "Invalid Article ID format"}
+        
+    article = await articles_collection.find_one({"_id": obj_id})
+    if not article:
+        return {"error": "Article not found"}
+        
+    text_to_read = article.get("simplified_text", "")
+    
+    if lang.lower() in ["hi", "ta"]:
+        trans = article.get("translations", {}).get(lang.lower())
+        if trans and trans.get("is_available") is not False:
+            text_to_read = trans.get("simplified_text", text_to_read)
+            
+    if not text_to_read:
+        return {"error": "No text available to read"}
+        
+    try:
+        from gtts import gTTS
+        from fastapi.responses import Response
+        import io
+        import asyncio
+        
+        def generate_audio():
+            tts = gTTS(text=text_to_read, lang=lang.lower(), slow=False)
+            fp_buffer = io.BytesIO()
+            tts.write_to_fp(fp_buffer)
+            return fp_buffer.getvalue()
+
+        # Run the blocking network audio generation in a separate thread
+        audio_content = await asyncio.to_thread(generate_audio)
+        
+        return Response(content=audio_content, media_type="audio/mpeg")
+    except Exception as e:
+        print(f"TTS Generation Error: {e}")
+        return {"error": "Failed to generate audio"}
+
+from pydantic import BaseModel
+
+class TTSSnippetRequest(BaseModel):
+    text: str
+    lang: str = "en"
+
+@app.post("/api/tts/snippet")
+async def get_tts_snippet(request: TTSSnippetRequest, current_user: dict = Depends(get_current_user)):
+    """API: Generate MP3 audio for a specific text snippet instantly"""
+    if not request.text or len(request.text.strip()) == 0:
+        return {"error": "Empty text string"}
+    try:
+        from gtts import gTTS
+        from fastapi.responses import Response
+        import io
+        import asyncio
+        
+        def generate_snippet():
+            tts = gTTS(text=request.text, lang=request.lang.lower(), slow=False)
+            fp_buffer = io.BytesIO()
+            tts.write_to_fp(fp_buffer)
+            return fp_buffer.getvalue()
+
+        audio_content = await asyncio.to_thread(generate_snippet)
+        return Response(content=audio_content, media_type="audio/mpeg")
+    except Exception as e:
+        print(f"TTS Snippet Error: {e}")
+        return {"error": "Failed to generate audio snippet"}
 
 from mongodb import metrics_collection
 
