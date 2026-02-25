@@ -8,5 +8,4 @@ export default defineConfig({
         tailwindcss(),
         react()
     ],
-    base: "/ai-news-summarize"
 })

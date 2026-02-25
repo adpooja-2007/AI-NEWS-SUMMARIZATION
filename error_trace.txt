@@ -1,0 +1,1 @@
+{"access_token":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2OTlkZTc0ZTVkM2M4YTIxM2E5M2QyOTkiLCJleHAiOjE3NzI1NjA4NDZ9.tfX6Dh0H6ADUl2PFtmuUtLY3ZzIIP3B4OuvR8SV4L3Y","token_type":"bearer","user":{"id":"699de74e5d3c8a213a93d299","username":"test_user_new99","email":"testnew99@test.com"}}

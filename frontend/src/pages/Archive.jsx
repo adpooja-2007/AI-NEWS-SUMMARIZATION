@@ -11,7 +11,12 @@ export default function ArchivePage() {
     const [currentMonth, setCurrentMonth] = useState(new Date())
 
     useEffect(() => {
-        fetch('http://localhost:8080/api/articles')
+        const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8001'
+        const token = localStorage.getItem('token')
+
+        fetch(`${baseUrl}/api/articles`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        })
             .then(res => res.json())
             .then(data => {
                 setArticles(data)
@@ -26,7 +31,7 @@ export default function ArchivePage() {
     if (loading) {
         return (
             <div className="flex justify-center items-center h-64">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-4 border-[#1e3a8a]"></div>
+                <div className="animate-spin rounded-full h-12 w-12 border-b-4 border-brand-primary"></div>
             </div>
         )
     }
@@ -91,9 +96,9 @@ export default function ArchivePage() {
                     key={i}
                     onClick={() => handleSelectDate(i)}
                     className={`h-10 w-10 mx-auto rounded-full flex items-center justify-center text-sm font-semibold transition-all
-                        ${isSelected ? 'bg-[#1e3a8a] text-white shadow-md scale-110' :
-                            isToday ? 'bg-slate-100 text-[#1e3a8a] ring-2 ring-[#60a5fa] ring-inset' :
-                                'text-slate-700 hover:bg-slate-100'}`}
+                        ${isSelected ? 'bg-gradient-to-r from-brand-gradient-1 to-brand-gradient-2 text-white shadow-md shadow-brand-primary/20 scale-110' :
+                            isToday ? 'bg-bg-hover text-brand-primary ring-2 ring-brand-gradient-2 ring-inset' :
+                                'text-text-main hover:bg-bg-hover'}`}
                 >
                     {i}
                 </button>
@@ -103,33 +108,33 @@ export default function ArchivePage() {
     }
 
     return (
-        <div className="space-y-10 max-w-5xl mx-auto">
+        <div className="space-y-10 max-w-5xl mx-auto transition-colors duration-300">
             {/* Header */}
             <div className="text-center sm:text-left">
-                <h2 className="text-3xl sm:text-4xl font-black tracking-tight text-[#1e3a8a] mb-2">
+                <h2 className="text-3xl sm:text-4xl font-black tracking-tight text-text-main mb-2">
                     News Archive
                 </h2>
-                <p className="text-lg text-slate-500 font-medium">
+                <p className="text-lg text-text-muted font-medium">
                     Explore past news simplified for your understanding.
                 </p>
             </div>
 
             {/* Centralized Search Card */}
-            <div className="bg-white rounded-[1.5rem] shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] border border-slate-100 p-8 sm:p-14 max-w-3xl mx-auto text-center flex flex-col items-center">
-                <div className="w-16 h-16 bg-[#ebf5ff] text-[#1e3a8a] rounded-2xl flex items-center justify-center mb-6 border border-blue-100">
+            <div className="bg-bg-card rounded-[1.5rem] shadow-sm border border-border-main p-8 sm:p-14 max-w-3xl mx-auto text-center flex flex-col items-center transition-colors duration-300">
+                <div className="w-16 h-16 bg-brand-secondary text-brand-primary rounded-2xl flex items-center justify-center mb-6 border border-brand-primary/20">
                     <Calendar size={32} />
                 </div>
 
-                <h3 className="text-xl font-bold text-[#1e3a8a] mb-6">Select a Date</h3>
+                <h3 className="text-xl font-bold text-text-main mb-6">Select a Date</h3>
 
                 <div className="w-full max-w-md space-y-4">
                     <div className="relative z-40">
                         {/* Custom Input Trigger */}
                         <div
                             onClick={() => setIsDatePickerOpen(!isDatePickerOpen)}
-                            className="w-full px-5 py-4 border-2 border-slate-100 bg-white rounded-xl shadow-sm text-left flex justify-between items-center cursor-pointer hover:border-[#1e3a8a]/30 transition-colors"
+                            className="w-full px-5 py-4 border-2 border-border-main bg-bg-hover rounded-xl shadow-sm text-left flex justify-between items-center cursor-pointer hover:border-brand-primary/30 transition-colors"
                         >
-                            <span className={`font-bold ${searchDate ? 'text-[#1e3a8a]' : 'text-slate-400'}`}>
+                            <span className={`font-bold ${searchDate ? 'text-brand-primary' : 'text-text-muted'}`}>
                                 {searchDate || 'Select a specific date...'}
                             </span>
                         </div>
@@ -137,7 +142,7 @@ export default function ArchivePage() {
                         {searchDate && (
                             <button
                                 onClick={(e) => { e.stopPropagation(); setSearchDate(''); }}
-                                className="absolute inset-y-0 right-4 flex items-center text-slate-400 hover:text-rose-500 transition-colors"
+                                className="absolute inset-y-0 right-4 flex items-center text-text-muted hover:text-red-500 transition-colors"
                             >
                                 <XCircle className="h-5 w-5" />
                             </button>
@@ -151,23 +156,23 @@ export default function ArchivePage() {
                                     animate={{ opacity: 1, y: 0, scale: 1 }}
                                     exit={{ opacity: 0, y: -10, scale: 0.95 }}
                                     transition={{ duration: 0.15 }}
-                                    className="absolute top-full left-0 w-full mt-2 bg-white rounded-2xl shadow-xl border border-slate-100 p-5 overflow-hidden z-20"
+                                    className="absolute top-full left-0 w-full mt-2 bg-bg-card rounded-2xl shadow-xl border border-border-main p-5 overflow-hidden z-20 transition-colors duration-300"
                                 >
                                     <div className="flex items-center justify-between mb-4 px-2">
-                                        <button onClick={handlePrevMonth} className="p-1 hover:bg-slate-100 rounded-lg text-slate-500 transition-colors">
+                                        <button onClick={handlePrevMonth} className="p-1 hover:bg-bg-hover rounded-lg text-text-muted transition-colors">
                                             <ChevronLeft size={20} />
                                         </button>
-                                        <h4 className="font-bold text-[#1e3a8a]">
+                                        <h4 className="font-bold text-text-main">
                                             {currentMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
                                         </h4>
-                                        <button onClick={handleNextMonth} className="p-1 hover:bg-slate-100 rounded-lg text-slate-500 transition-colors">
+                                        <button onClick={handleNextMonth} className="p-1 hover:bg-bg-hover rounded-lg text-text-muted transition-colors">
                                             <ChevronRight size={20} />
                                         </button>
                                     </div>
 
                                     <div className="grid grid-cols-7 gap-1 mb-2">
                                         {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map(day => (
-                                            <div key={day} className="text-center text-xs font-bold text-slate-400 uppercase">
+                                            <div key={day} className="text-center text-xs font-bold text-text-muted/70 uppercase">
                                                 {day}
                                             </div>
                                         ))}
@@ -183,7 +188,7 @@ export default function ArchivePage() {
 
                     <button
                         onClick={() => setIsDatePickerOpen(false)}
-                        className="w-full py-3.5 bg-[#1e3a8a] hover:bg-[#1e3a8a]/90 text-white rounded-xl font-bold transition-transform active:scale-[0.98] shadow-sm"
+                        className="w-full py-3.5 bg-gradient-to-r from-brand-gradient-1 to-brand-gradient-2 hover:opacity-90 text-white rounded-xl font-bold transition-transform active:scale-[0.98] shadow-sm shadow-brand-primary/20"
                     >
                         Fetch Archive
                     </button>
@@ -195,30 +200,30 @@ export default function ArchivePage() {
                 <motion.div
                     initial={{ opacity: 0, scale: 0.95 }}
                     animate={{ opacity: 1, scale: 1 }}
-                    className="bg-slate-50 border-2 border-dashed border-slate-300 rounded-2xl p-12 text-center text-slate-500 max-w-3xl mx-auto"
+                    className="bg-bg-card border-2 border-dashed border-border-main rounded-2xl p-12 text-center text-text-muted max-w-3xl mx-auto transition-colors duration-300"
                 >
-                    <CalendarSearch size={48} className="mx-auto text-slate-300 mb-4" />
-                    <h3 className="text-2xl font-bold text-slate-700 mb-2">No news found</h3>
-                    <p className="text-lg">We couldn't find any articles published on <span className="font-bold text-slate-900">{searchDate}</span>.</p>
+                    <CalendarSearch size={48} className="mx-auto text-text-muted/50 mb-4" />
+                    <h3 className="text-2xl font-bold text-text-main mb-2">No news found</h3>
+                    <p className="text-lg">We couldn't find any articles published on <span className="font-bold text-text-main">{searchDate}</span>.</p>
                 </motion.div>
             ) : !searchDate ? (
                 // Skeletons when no search date is provided (to match mockup)
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 max-w-5xl mx-auto opacity-50">
                     {[1, 2, 3].map((skel) => (
-                        <div key={skel} className="bg-white/60 rounded-[2rem] border border-slate-100 p-6 flex flex-col justify-between gap-4 min-h-[320px]">
+                        <div key={skel} className="bg-bg-card/60 rounded-[2rem] border border-border-main p-6 flex flex-col justify-between gap-4 min-h-[320px] transition-colors duration-300">
                             <div className="flex flex-col gap-4">
                                 <div className="flex gap-2">
-                                    <div className="h-8 bg-slate-200 rounded-lg w-20"></div>
-                                    <div className="h-8 bg-slate-200 rounded-lg w-16"></div>
+                                    <div className="h-8 bg-bg-hover rounded-lg w-20"></div>
+                                    <div className="h-8 bg-bg-hover rounded-lg w-16"></div>
                                 </div>
                                 <div className="space-y-3 mt-4">
-                                    <div className="h-6 bg-slate-200 rounded-full w-full"></div>
-                                    <div className="h-6 bg-slate-200 rounded-full w-5/6"></div>
-                                    <div className="h-6 bg-slate-200 rounded-full w-3/4"></div>
+                                    <div className="h-6 bg-bg-hover rounded-full w-full"></div>
+                                    <div className="h-6 bg-bg-hover rounded-full w-5/6"></div>
+                                    <div className="h-6 bg-bg-hover rounded-full w-3/4"></div>
                                 </div>
                             </div>
                             <div className="flex justify-end mt-auto">
-                                <div className="h-12 w-12 bg-slate-200 rounded-[1rem]"></div>
+                                <div className="h-12 w-12 bg-bg-hover rounded-[1rem]"></div>
                             </div>
                         </div>
                     ))}
@@ -250,23 +255,23 @@ export default function ArchivePage() {
                                                 animate={{ opacity: 1, scale: 1 }}
                                                 transition={{ delay: index * 0.05 }}
                                                 whileHover={{ scale: 1.02, y: -4 }}
-                                                className="group h-full bg-white rounded-[2rem] p-6 border border-slate-100 hover:border-[#1e3a8a] shadow-[0_4px_20px_-4px_rgba(0,0,0,0.02)] hover:shadow-xl transition-all duration-300 cursor-pointer flex flex-col justify-between gap-6 min-h-[320px]"
+                                                className="group h-full bg-bg-card rounded-[2rem] p-6 border border-border-main hover:border-brand-primary shadow-sm hover:shadow-xl transition-all duration-300 cursor-pointer flex flex-col justify-between gap-6 min-h-[320px]"
                                             >
                                                 <div className="flex flex-col gap-4 h-full">
-                                                    <div className="flex flex-wrap items-center gap-2 text-xs font-bold text-slate-500">
-                                                        <span className="bg-[#ebf5ff] text-[#1e3a8a] px-3 py-1.5 rounded-lg border border-blue-100 tracking-wide">
+                                                    <div className="flex flex-wrap items-center gap-2 text-xs font-bold text-text-muted">
+                                                        <span className="bg-brand-secondary text-brand-primary px-3 py-1.5 rounded-lg border border-brand-primary/20 tracking-wide transition-colors">
                                                             {article.genre || 'General'}
                                                         </span>
-                                                        <span className="flex items-center gap-1 bg-slate-50 px-2.5 py-1.5 border border-slate-100 rounded-lg text-slate-500">
+                                                        <span className="flex items-center gap-1 bg-bg-hover px-2.5 py-1.5 border border-border-main rounded-lg text-text-muted transition-colors">
                                                             <Clock size={14} /> {article.read_time_min}m
                                                         </span>
                                                     </div>
-                                                    <h4 className="text-xl sm:text-2xl font-black text-slate-800 leading-snug group-hover:text-[#1e3a8a] transition-colors line-clamp-4">
+                                                    <h4 className="text-xl sm:text-2xl font-black text-text-main leading-snug group-hover:text-brand-primary transition-colors line-clamp-4">
                                                         {article.headline}
                                                     </h4>
                                                 </div>
                                                 <div className="flex justify-end mt-auto">
-                                                    <div className="bg-slate-50 p-3.5 rounded-[1rem] group-hover:bg-[#1e3a8a] group-hover:text-white transition-colors border border-slate-100 text-slate-400 shadow-sm inline-flex items-center justify-center">
+                                                    <div className="bg-bg-hover p-3.5 rounded-[1rem] group-hover:bg-brand-secondary group-hover:text-brand-primary transition-colors border border-border-main text-text-muted shadow-sm inline-flex items-center justify-center duration-300">
                                                         <ChevronRight size={20} />
                                                     </div>
                                                 </div>

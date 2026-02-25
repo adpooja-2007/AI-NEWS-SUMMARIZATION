@@ -1,20 +1,91 @@
 @import "tailwindcss";
 
-/* Premium High-Contrast Theme */
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
-    --color-primary-50: #eff6ff;
-    --color-primary-100: #dbeafe;
-    --color-primary-500: #3b82f6;
-    --color-primary-600: #2563eb;
-    --color-primary-700: #1d4ed8;
+    /* Map Tailwind colors to CSS vars */
+    --color-bg-base: var(--theme-bg-base);
+    --color-bg-card: var(--theme-bg-card);
+    --color-bg-hover: var(--theme-bg-hover);
+
+    --color-text-main: var(--theme-text-main);
+    --color-text-muted: var(--theme-text-muted);
+
+    --color-border-subtle: var(--theme-border-subtle);
+    --color-border-main: var(--theme-border-main);
+
+    --color-brand-primary: var(--theme-brand-primary);
+    --color-brand-secondary: var(--theme-brand-secondary);
+    --color-brand-gradient-1: var(--theme-brand-gradient-1);
+    --color-brand-gradient-2: var(--theme-brand-gradient-2);
 
     --font-sans: "Inter", system-ui, -apple-system, sans-serif;
 }
 
+:root {
+    /* LIGHT THEME (White & Blue) */
+    --theme-bg-base: #f8fafc;
+    /* slate-50 */
+    --theme-bg-card: #ffffff;
+    /* white */
+    --theme-bg-hover: #f1f5f9;
+    /* slate-100 */
+
+    --theme-text-main: #0f172a;
+    /* slate-900 */
+    --theme-text-muted: #64748b;
+    /* slate-500 */
+
+    --theme-border-subtle: #f1f5f9;
+    /* slate-100 */
+    --theme-border-main: #e2e8f0;
+    /* slate-200 */
+
+    --theme-brand-primary: #2563eb;
+    /* blue-600 */
+    --theme-brand-secondary: #dbeafe;
+    /* blue-100 for soft backgrounds */
+    --theme-brand-gradient-1: #3b82f6;
+    /* blue-500 */
+    --theme-brand-gradient-2: #60a5fa;
+    /* blue-400 */
+}
+
+.dark {
+    /* DARK THEME (Black & Purple) */
+    --theme-bg-base: #000000;
+    /* pure black */
+    --theme-bg-card: #111111;
+    /* near black */
+    --theme-bg-hover: #1f1f1f;
+    /* very dark gray */
+
+    --theme-text-main: #ffffff;
+    /* pure white for highest contrast */
+    --theme-text-muted: #a1a1aa;
+    /* zinc-400 */
+
+    --theme-border-subtle: #1f1f1f;
+    /* zinc-900 */
+    --theme-border-main: #27272a;
+    /* zinc-800 */
+
+    --theme-brand-primary: #a855f7;
+    /* purple-500 */
+    --theme-brand-secondary: #3b0764;
+    /* purple-900 for soft backgrounds */
+    --theme-brand-gradient-1: #a855f7;
+    /* purple-500 */
+    --theme-brand-gradient-2: #c084fc;
+    /* purple-400 */
+}
+
 @layer base {
     body {
-        @apply bg-slate-50 text-slate-900 antialiased;
-        /* Enforce high readability defaults */
+        background-color: var(--theme-bg-base);
+        color: var(--theme-text-main);
+        transition: background-color 0.3s ease, color 0.3s ease;
+        @apply antialiased;
         font-size: 1.125rem;
         line-height: 1.8;
     }

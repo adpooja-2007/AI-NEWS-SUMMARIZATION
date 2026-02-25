@@ -1,22 +1,51 @@
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import Layout from './components/Layout'
 import Feed from './pages/Feed'
 import ArticleDetail from './pages/ArticleDetail'
 import AdminDashboard from './pages/AdminDashboard'
 import ArchivePage from './pages/Archive'
+import { Login } from './pages/Login'
+import { Signup } from './pages/Signup'
+import { AuthProvider } from './context/AuthContext'
+import { ThemeProvider } from './context/ThemeContext'
+import { useAuth } from './context/AuthContext'
+
+// Protected Route Wrapper Component
+const ProtectedRoute = ({ children }) => {
+    const { user, loading } = useAuth()
+
+    if (loading) {
+        return <div className="min-h-screen flex items-center justify-center bg-bg-base text-text-main">Loading...</div>
+    }
+
+    if (!user) {
+        return <Navigate to="/login" replace />
+    }
+
+    return children
+}
 
 function App() {
     return (
-        <Router>
-            <Layout>
-                <Routes>
-                    <Route path="/" element={<Feed />} />
-                    <Route path="/archive" element={<ArchivePage />} />
-                    <Route path="/article/:id" element={<ArticleDetail />} />
-                    <Route path="/admin" element={<AdminDashboard />} />
-                </Routes>
-            </Layout>
-        </Router>
+        <ThemeProvider>
+            <AuthProvider>
+                <Router>
+                    <Layout>
+                        <Routes>
+                            {/* Protected Routes */}
+                            <Route path="/" element={<ProtectedRoute><Feed /></ProtectedRoute>} />
+                            <Route path="/archive" element={<ProtectedRoute><ArchivePage /></ProtectedRoute>} />
+                            <Route path="/article/:id" element={<ProtectedRoute><ArticleDetail /></ProtectedRoute>} />
+                            <Route path="/admin" element={<ProtectedRoute><AdminDashboard /></ProtectedRoute>} />
+
+                            {/* Public Routes */}
+                            <Route path="/login" element={<Login />} />
+                            <Route path="/signup" element={<Signup />} />
+                        </Routes>
+                    </Layout>
+                </Router>
+            </AuthProvider>
+        </ThemeProvider>
     )
 }
 

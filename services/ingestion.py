@@ -2,9 +2,12 @@ import datetime
 import random
 import feedparser
 from bs4 import BeautifulSoup
-from sqlalchemy.orm import Session
-from database import ArticleOriginal, ArticleSimplified, FactVerificationLog, Quiz, QuizAnswer
 from services.nlp_engine import run_nlp_pipeline
+from mongodb import articles_collection
+import os
+import uuid
+from datetime import datetime
+import asyncio
 
 # Public RSS feeds - English only, no Hindi or other non-English feeds
 LIVE_RSS_FEEDS = [
@@ -56,7 +59,7 @@ def fetch_full_article_text(url):
         print(f"Failed to fetch full article {url}: {e}")
         return ""
 
-def ingest_rss_feed(db: Session):
+async def ingest_rss_feed():
     """
     Pulls a real live RSS feed URL.
     Fetches the first unprocessed article, saves it, and triggers pipeline.
@@ -84,7 +87,8 @@ def ingest_rss_feed(db: Session):
     article_data = None
     for item in parsed_feed.entries:
         link = item.get("link", "")
-        existing = db.query(ArticleOriginal).filter(ArticleOriginal.source_url == link).first()
+        # Check if already processed
+        existing = await articles_collection.find_one({"original.source_url": link})
         if not existing:
             article_data = item
             break
@@ -381,93 +385,71 @@ def ingest_rss_feed(db: Session):
         
     print(f"Ingesting real article from {publisher}: {headline}")
     
-    # Save original
-    original = ArticleOriginal(
-        source_url=url,
-        publisher_name=publisher,
-        headline=headline,
-        raw_text=raw_text,
-        published_date=datetime.datetime.now().isoformat()
-    )
-    db.add(original)
-    db.commit()
-    db.refresh(original)
-    
     # Run NLP Pipeline
-    pipeline_result = run_nlp_pipeline(original.raw_text)
+    pipeline_result = run_nlp_pipeline(raw_text)
     
     if pipeline_result["status"] == "FAIL_MAX_RETRIES":
         # Save as failed
-        simplified = ArticleSimplified(
-            original_id=original.id,
-            simplified_headline="Processing Failed",
-            simplified_text="The AI pipeline could not generate a verifiable simplified version.",
-            processing_status="FAIL" # Fact-check or readability failed
-        )
-        db.add(simplified)
-        db.commit()
+        failed_doc = {
+            "original": {
+                "source_url": url,
+                "publisher_name": publisher,
+                "headline": headline,
+                "raw_text": raw_text,
+                "published_date": datetime.now().isoformat()
+            },
+            "simplified_headline": "Processing Failed",
+            "simplified_text": "The AI pipeline could not generate a verifiable simplified version.",
+            "processing_status": "FAIL",
+            "created_at": datetime.now().isoformat()
+        }
+        await articles_collection.insert_one(failed_doc)
         return {"status": "FAILED", "msg": "Pipeline failed max retries."}
         
     # Successfully processed! Save Simplified
     simplified_text_to_save = pipeline_result["simplified_text"]
     
-    # DEBUG: Log what we're saving
-    print(f"SAVING TO DATABASE:")
-    print(f"  Simplified text length: {len(simplified_text_to_save)} characters")
-    print(f"  Simplified text word count: {len(simplified_text_to_save.split())} words")
-    print(f"  Original text length: {len(original.raw_text)} characters")
-    print(f"  Original text word count: {len(original.raw_text.split())} words")
-    print(f"  Simplified text preview (first 300 chars): {simplified_text_to_save[:300]}")
-    print(f"  Simplified text preview (last 300 chars): {simplified_text_to_save[-300:]}")
-    
-    simplified = ArticleSimplified(
-        original_id=original.id,
-        simplified_headline=original.headline, # Keeping original headline for simplicity
-        simplified_text=simplified_text_to_save,
-        readability_score=pipeline_result["readability_score"],
-        word_count=pipeline_result["word_count"],
-        processing_status="PASS",
-        genre=pipeline_result.get("genre", "General")
-    )
-    db.add(simplified)
-    db.commit()
-    
-    # DEBUG: Verify what was saved
-    db.refresh(simplified)
-    saved_text_length = len(simplified.simplified_text) if simplified.simplified_text else 0
-    print(f"  VERIFIED SAVED: {saved_text_length} characters in database")
-    if saved_text_length != len(simplified_text_to_save):
-        print(f"  WARNING: Text length mismatch! Saved {saved_text_length} but tried to save {len(simplified_text_to_save)}")
-    db.refresh(simplified)
-    
-    # Save Fact Check Logs
-    fact_data = pipeline_result["fact_result"]
-    fact_log = FactVerificationLog(
-        simplified_id=simplified.id,
-        confidence_pct=fact_data["confidence_pct"],
-        matched_entities_count=fact_data["matched_entities_count"],
-        failure_reason=fact_data["failure_reason"]
-    )
-    db.add(fact_log)
-    
-    # Save Quizzes
+    # Format Quizzes
+    quizzes = []
     for q_data in pipeline_result["quiz_data"]:
-        quiz_model = Quiz(
-            simplified_id=simplified.id,
-            question_text=q_data["question_text"],
-            question_type=q_data["question_type"]
-        )
-        db.add(quiz_model)
-        db.commit()
-        db.refresh(quiz_model)
-        
+        quiz = {
+            "id": str(uuid.uuid4()),
+            "question_text": q_data["question_text"],
+            "question_type": q_data.get("question_type", "multiple_choice"),
+            "answers": []
+        }
         for ans_data in q_data["answers"]:
-            ans_model = QuizAnswer(
-                quiz_id=quiz_model.id,
-                answer_text=ans_data["text"],
-                is_correct=ans_data["is_correct"]
-            )
-            db.add(ans_model)
-            
-    db.commit()
+            quiz["answers"].append({
+                "id": str(uuid.uuid4()),
+                "answer_text": ans_data["text"],
+                "is_correct": ans_data["is_correct"]
+            })
+        quizzes.append(quiz)
+    
+    # Construct complete document
+    success_doc = {
+        "original": {
+            "source_url": url,
+            "publisher_name": publisher,
+            "headline": headline,
+            "raw_text": raw_text,
+            "published_date": datetime.now().isoformat()
+        },
+        "simplified_headline": headline,
+        "simplified_text": simplified_text_to_save,
+        "readability_score": pipeline_result["readability_score"],
+        "word_count": pipeline_result["word_count"],
+        "genre": pipeline_result.get("genre", "General"),
+        "processing_status": "PASS",
+        "fact_verification": {
+            "confidence_pct": pipeline_result["fact_result"]["confidence_pct"],
+            "matched_entities_count": pipeline_result["fact_result"]["matched_entities_count"],
+            "failure_reason": pipeline_result["fact_result"]["failure_reason"]
+        },
+        "quizzes": quizzes,
+        "created_at": datetime.now().isoformat()
+    }
+    
+    await articles_collection.insert_one(success_doc)
+    
     return {"status": "SUCCESS", "msg": f"Ingested & Processed: {headline[:30]}..."}

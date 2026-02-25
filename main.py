@@ -1,7 +1,7 @@
 from fastapi import FastAPI, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
-from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
 import uvicorn
 import os
 
@@ -12,15 +12,19 @@ import database
 app = FastAPI(title="AI Simplified News Platform API")
 
 # Setup Background Auto-Ingest Scheduler
-scheduler = BackgroundScheduler()
+scheduler = AsyncIOScheduler()
 
-def scheduled_ingestion():
+
+from routes_auth import router as auth_router
+
+import asyncio
+
+async def scheduled_ingestion():
     print("Running scheduled auto-ingestion...")
-    db = next(get_db())
     try:
-        ingest_rss_feed(db)
-    finally:
-        db.close()
+        await ingest_rss_feed()
+    except Exception as e:
+        print(f"Error during scheduled auto-ingestion: {e}")
 
 @app.on_event("startup")
 def startup_event():
@@ -31,118 +35,143 @@ def startup_event():
 def shutdown_event():
     scheduler.shutdown()
 
+from fastapi.middleware.cors import CORSMiddleware
+import os
+
+# Define allowed origins for CORS
+origins = [
+    "http://localhost:3000",          # Local React developer server
+    "http://127.0.0.1:3000",
+]
+
+# If deployed, allow the production frontend URL
+frontend_url = os.getenv("FRONTEND_URL")
+if frontend_url:
+    origins.append(frontend_url)
+
 # Add CORS middleware to allow React frontend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # For hackathon demo purposes
+    allow_origins=origins, 
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+# Register Auth Router
+app.include_router(auth_router, prefix="/api/auth", tags=["auth"])
+
+from mongodb import articles_collection, item_helper
+from auth import get_current_user
+
 @app.get("/api/articles")
-async def get_articles(db: Session = Depends(get_db)):
+async def get_articles(current_user: dict = Depends(get_current_user)):
     """API: Return feed of simplified articles"""
-    articles = db.query(ArticleSimplified).filter(ArticleSimplified.processing_status == "PASS").order_by(ArticleSimplified.id.desc()).all()
+    # Fetch all articles that passed processing
+    cursor = articles_collection.find({"processing_status": "PASS"}).sort("_id", -1)
+    articles = await cursor.to_list(length=100)
     
     result = []
     for art in articles:
+        art = item_helper(art)
         result.append({
-            "id": art.id,
-            "headline": art.simplified_headline,
-            "publisher_name": art.original.publisher_name if art.original else "Unknown",
-            "date": art.original.published_date[:10] if art.original else "Unknown",
-            "read_time_min": max(1, round(art.word_count / 150)),
-            "readability_score": art.readability_score,
-            "genre": getattr(art, "genre", "General")
+            "id": art["id"],
+            "headline": art.get("simplified_headline", ""),
+            "publisher_name": art.get("original", {}).get("publisher_name", "Unknown"),
+            "date": art.get("original", {}).get("published_date", "Unknown")[:10],
+            "read_time_min": max(1, round(art.get("word_count", 0) / 150)),
+            "readability_score": art.get("readability_score", 0),
+            "genre": art.get("genre", "General")
         })
     return result
 
+from bson import ObjectId
+
 @app.get("/api/articles/{article_id}")
-async def get_article_detail(article_id: int, db: Session = Depends(get_db)):
+async def get_article_detail(article_id: str, current_user: dict = Depends(get_current_user)):
     """API: Return full article detail, fact verification, and quizzes"""
-    article = db.query(ArticleSimplified).filter(ArticleSimplified.id == article_id).first()
+    try:
+        obj_id = ObjectId(article_id)
+    except:
+        return {"error": "Invalid Article ID format"}
+        
+    article = await articles_collection.find_one({"_id": obj_id})
     if not article:
         return {"error": "Article not found"}
-    
-    # DEBUG: Log what's in the database
-    simplified_text_length = len(article.simplified_text) if article.simplified_text else 0
-    simplified_word_count = len(article.simplified_text.split()) if article.simplified_text else 0
-    original_text_length = len(article.original.raw_text) if article.original and article.original.raw_text else 0
-    
-    print(f"API DEBUG - Article ID {article_id}:")
-    print(f"  Simplified text length: {simplified_text_length} chars, {simplified_word_count} words")
-    print(f"  Original text length: {original_text_length} chars")
-    print(f"  Simplified text preview (first 200 chars): {article.simplified_text[:200] if article.simplified_text else 'None'}")
         
+    article = item_helper(article)
+    
     formatted_quizzes = []
-    for q in article.quizzes:
+    for q in article.get("quizzes", []):
         formatted_quizzes.append({
-            "id": q.id,
-            "question_text": q.question_text,
-            "answers": [{"id": a.id, "text": a.answer_text} for a in q.answers]
+            "id": str(q.get("id", "")),
+            "question_text": q.get("question_text", ""),
+            "answers": [{"id": str(a.get("id", "")), "text": a.get("answer_text", "")} for a in q.get("answers", [])]
         })
     
     response_data = {
-        "id": article.id,
-        "headline": article.simplified_headline,
-        "publisher_name": article.original.publisher_name if article.original else "Unknown",
-        "simplified_text": article.simplified_text,
-        "original_text": article.original.raw_text if article.original else "",
-        "original_url": article.original.source_url if article.original else "",
-        "fact_confidence": article.fact_verification.confidence_pct if article.fact_verification else 0,
-        "matched_entities": article.fact_verification.matched_entities_count if article.fact_verification else 0,
+        "id": article["id"],
+        "headline": article.get("simplified_headline", ""),
+        "publisher_name": article.get("original", {}).get("publisher_name", "Unknown"),
+        "simplified_text": article.get("simplified_text", ""),
+        "original_text": article.get("original", {}).get("raw_text", ""),
+        "original_url": article.get("original", {}).get("source_url", ""),
+        "fact_confidence": article.get("fact_verification", {}).get("confidence_pct", 0),
+        "matched_entities": article.get("fact_verification", {}).get("matched_entities_count", 0),
         "quizzes": formatted_quizzes
     }
     
-    # DEBUG: Log what we're returning
-    response_simplified_length = len(response_data["simplified_text"]) if response_data["simplified_text"] else 0
-    print(f"  Response simplified_text length: {response_simplified_length} chars")
-    
     return response_data
 
+from mongodb import metrics_collection
+
 @app.post("/api/quiz/{article_id}")
-async def submit_quiz(article_id: int, request: Request, db: Session = Depends(get_db)):
+async def submit_quiz(article_id: str, request: Request, current_user: dict = Depends(get_current_user)):
     """API: Submit quiz answers and return score"""
     payload = await request.json()
     answers = payload.get("answers", {}) # dict of {quiz_id: selected_answer_id}
     
-    article = db.query(ArticleSimplified).filter(ArticleSimplified.id == article_id).first()
+    try:
+        obj_id = ObjectId(article_id)
+    except:
+        return {"error": "Invalid Article ID format"}
+        
+    article = await articles_collection.find_one({"_id": obj_id})
     if not article:
         return {"error": "Article not found"}
         
     correct_count = 0
-    total_count = len(article.quizzes)
+    quizzes = article.get("quizzes", [])
+    total_count = len(quizzes)
     
     if total_count > 0:
         correct_answers_map = {}
-        for quiz in article.quizzes:
-            selected_id = answers.get(str(quiz.id))
+        for quiz in quizzes:
+            quiz_id_str = str(quiz.get("id"))
+            selected_id = answers.get(quiz_id_str)
             
             # Find the correct answer for this question
-            correct_ans = next((a for a in quiz.answers if a.is_correct), None)
+            correct_ans = next((a for a in quiz.get("answers", []) if a.get("is_correct")), None)
             if correct_ans:
-                correct_answers_map[quiz.id] = {
-                    "id": correct_ans.id,
-                    "text": correct_ans.answer_text
+                correct_answers_map[quiz_id_str] = {
+                    "id": str(correct_ans.get("id")),
+                    "text": correct_ans.get("answer_text")
                 }
                 
-            if selected_id:
-                answer = db.query(QuizAnswer).filter(QuizAnswer.id == selected_id).first()
-                if answer and answer.is_correct:
-                    correct_count += 1
+            if str(selected_id) == str(correct_ans.get("id", "")):
+                correct_count += 1
                     
         score_pct = (correct_count / total_count) * 100
         
         # Save metric
-        metric = Metric(
-            article_id=article_id,
-            quiz_score_pct=score_pct,
-            time_on_page_seconds=120,
-            viewed_original=payload.get("viewed_original", False)
-        )
-        db.add(metric)
-        db.commit()
+        metric_doc = {
+            "article_id": str(obj_id),
+            "quiz_score_pct": score_pct,
+            "time_on_page_seconds": 120,
+            "viewed_original": payload.get("viewed_original", False),
+            "created_at": str(os.getenv("CURRENT_TIME", "Now"))
+        }
+        await metrics_collection.insert_one(metric_doc)
         
         return {
             "score": score_pct, 
@@ -153,16 +182,18 @@ async def submit_quiz(article_id: int, request: Request, db: Session = Depends(g
     return {"score": 0, "correct": 0, "total": 0, "correct_answers": {}}
 
 @app.get("/api/admin/stats")
-async def get_admin_stats(db: Session = Depends(get_db)):
+async def get_admin_stats(current_user: dict = Depends(get_current_user)):
     """API: Get dashboard metrics"""
-    total = db.query(ArticleSimplified).count()
-    successful = db.query(ArticleSimplified).filter(ArticleSimplified.processing_status == "PASS").count()
+    total = await articles_collection.count_documents({})
+    successful = await articles_collection.count_documents({"processing_status": "PASS"})
     
-    metrics = db.query(Metric).all()
-    avg_score = sum(m.quiz_score_pct for m in metrics) / len(metrics) if metrics else 0
+    cursor = metrics_collection.find({})
+    metrics = await cursor.to_list(length=1000)
+    avg_score = sum(m.get("quiz_score_pct", 0) for m in metrics) / len(metrics) if metrics else 0
     
-    success_arts = db.query(ArticleSimplified).filter(ArticleSimplified.processing_status == "PASS").all()
-    avg_readability = sum(a.readability_score for a in success_arts) / len(success_arts) if success_arts else 0
+    success_cursor = articles_collection.find({"processing_status": "PASS"})
+    success_arts = await success_cursor.to_list(length=1000)
+    avg_readability = sum(a.get("readability_score", 0) for a in success_arts) / len(success_arts) if success_arts else 0
     
     return {
         "total_processed": total,
@@ -172,9 +203,9 @@ async def get_admin_stats(db: Session = Depends(get_db)):
     }
 
 @app.post("/api/admin/ingest")
-async def trigger_ingestion(db: Session = Depends(get_db)):
+async def trigger_ingestion(current_user: dict = Depends(get_current_user)):
     """API: Trigger mock ingestion"""
-    result = ingest_rss_feed(db)
+    result = await ingest_rss_feed()
     return result
 
 if __name__ == "__main__":

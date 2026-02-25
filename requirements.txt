@@ -7,3 +7,9 @@ requests
 beautifulsoup4
 feedparser
 googletrans==4.0.0rc1
+groq
+motor
+pydantic
+passlib[bcrypt]
+python-jose[cryptography]
+python-multipart

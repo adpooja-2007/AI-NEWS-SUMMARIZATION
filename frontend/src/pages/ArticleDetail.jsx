@@ -12,7 +12,12 @@ export default function ArticleDetail() {
     const [showOriginal, setShowOriginal] = useState(false)
 
     useEffect(() => {
-        fetch(`http://localhost:8080/api/articles/${id}`)
+        const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8001'
+        const token = localStorage.getItem('token')
+
+        fetch(`${baseUrl}/api/articles/${id}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        })
             .then(res => res.json())
             .then(data => {
                 setArticle(data)
@@ -31,9 +36,15 @@ export default function ArticleDetail() {
     const submitQuiz = async (e) => {
         e.preventDefault()
         try {
-            const res = await fetch(`http://localhost:8080/api/quiz/${id}`, {
+            const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8001'
+            const token = localStorage.getItem('token')
+
+            const res = await fetch(`${baseUrl}/api/quiz/${id}`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
                 body: JSON.stringify({ answers, viewed_original: showOriginal })
             })
             const data = await res.json()
@@ -46,7 +57,7 @@ export default function ArticleDetail() {
     if (loading || !article) {
         return (
             <div className="flex justify-center items-center h-64">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-4 border-primary-600"></div>
+                <div className="animate-spin rounded-full h-12 w-12 border-b-4 border-brand-primary"></div>
             </div>
         )
     }
@@ -54,17 +65,17 @@ export default function ArticleDetail() {
     const isVerified = article.fact_confidence >= 90
 
     return (
-        <div className="relative">
-            <Link to="/" className="inline-flex items-center gap-2 text-slate-500 hover:text-primary-600 font-semibold mb-8 transition-colors">
+        <div className="relative transition-colors duration-300">
+            <Link to="/" className="inline-flex items-center gap-2 text-text-muted hover:text-brand-primary font-semibold mb-8 transition-colors">
                 <ArrowLeft size={20} /> Back to Feed
             </Link>
 
-            <article className="bg-white rounded-3xl p-6 sm:p-12 shadow-sm border border-slate-200">
-                <h1 className="text-3xl sm:text-5xl font-extrabold text-slate-900 leading-tight mb-8 tracking-tight">
+            <article className="bg-bg-card rounded-3xl p-6 sm:p-12 shadow-sm border border-border-main transition-colors duration-300">
+                <h1 className="text-3xl sm:text-5xl font-extrabold text-text-main leading-tight mb-8 tracking-tight">
                     {article.headline}
                 </h1>
 
-                <div className={`inline-flex items-center gap-3 px-5 py-3 rounded-full font-bold text-sm sm:text-base mb-10 border-2 ${isVerified ? 'bg-green-50 text-green-700 border-green-200' : 'bg-red-50 text-red-700 border-red-200'}`}>
+                <div className={`inline-flex items-center gap-3 px-5 py-3 rounded-full font-bold text-sm sm:text-base mb-10 border-2 ${isVerified ? 'bg-green-500/10 text-green-500 border-green-500/20' : 'bg-red-500/10 text-red-500 border-red-500/20'}`}>
                     {isVerified ? (
                         <>
                             <ShieldCheck className="animate-pulse" size={24} />
@@ -81,14 +92,14 @@ export default function ArticleDetail() {
                     )}
                 </div>
 
-                <div className="prose prose-lg prose-slate max-w-none text-xl leading-relaxed text-slate-800 mb-16">
+                <div className="prose prose-lg max-w-none text-xl leading-relaxed text-text-main mb-16">
                     <p>{article.simplified_text}</p>
                 </div>
 
                 {article.quizzes && article.quizzes.length > 0 && (
-                    <div className="bg-slate-50 border-2 border-slate-200 rounded-3xl p-8 sm:p-10 mb-16 relative overflow-hidden">
-                        <div className="absolute top-0 left-0 w-2 h-full bg-primary-500"></div>
-                        <h3 className="text-2xl font-black text-slate-900 mb-8 border-b-2 border-slate-200 pb-4">
+                    <div className="bg-bg-hover border-2 border-border-main rounded-3xl p-8 sm:p-10 mb-16 relative overflow-hidden transition-colors duration-300">
+                        <div className="absolute top-0 left-0 w-2 h-full bg-gradient-to-b from-brand-gradient-1 to-brand-gradient-2"></div>
+                        <h3 className="text-2xl font-black text-text-main mb-8 border-b-2 border-border-main pb-4">
                             Check Your Understanding
                         </h3>
 
@@ -99,18 +110,18 @@ export default function ArticleDetail() {
                                     animate={{ opacity: 1, scale: 1 }}
                                     className="space-y-8"
                                 >
-                                    <div className={`border-2 rounded-2xl p-8 text-center ${quizResult.score > 60 ? 'bg-green-50 border-green-500' : 'bg-amber-50 border-amber-500'}`}>
+                                    <div className={`border-2 rounded-2xl p-8 text-center ${quizResult.score > 60 ? 'bg-green-500/10 border-green-500' : 'bg-amber-500/10 border-amber-500'}`}>
                                         <div className="text-5xl mb-4">{quizResult.score > 60 ? '🎉' : '📝'}</div>
-                                        <h4 className={`text-2xl font-black mb-2 ${quizResult.score > 60 ? 'text-green-800' : 'text-amber-800'}`}>
+                                        <h4 className={`text-2xl font-black mb-2 ${quizResult.score > 60 ? 'text-green-500' : 'text-amber-500'}`}>
                                             Quiz Complete!
                                         </h4>
-                                        <p className={`font-bold text-xl ${quizResult.score > 60 ? 'text-green-700' : 'text-amber-700'}`}>
+                                        <p className={`font-bold text-xl ${quizResult.score > 60 ? 'text-green-500/80' : 'text-amber-500/80'}`}>
                                             You scored {quizResult.score.toFixed(0)}% ({quizResult.correct}/{quizResult.total})
                                         </p>
                                     </div>
 
                                     <div className="space-y-6 mt-8">
-                                        <h4 className="text-xl font-bold text-slate-800 border-b-2 border-slate-200 pb-2">Review Your Answers</h4>
+                                        <h4 className="text-xl font-bold text-text-main border-b-2 border-border-main pb-2">Review Your Answers</h4>
                                         {article.quizzes.map((quiz, i) => {
                                             const userAnswerId = answers[quiz.id];
                                             const correctAnswer = quizResult.correct_answers?.[quiz.id];
@@ -118,14 +129,14 @@ export default function ArticleDetail() {
                                             const userAnswerText = quiz.answers.find(a => String(a.id) === String(userAnswerId))?.text;
 
                                             return (
-                                                <div key={quiz.id} className={`p-5 rounded-xl border-2 ${isCorrect ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50'}`}>
-                                                    <p className="font-bold text-slate-800 mb-3">{i + 1}. {quiz.question_text}</p>
+                                                <div key={quiz.id} className={`p-5 rounded-xl border-2 ${isCorrect ? 'border-green-500/30 bg-green-500/5' : 'border-red-500/30 bg-red-500/5'}`}>
+                                                    <p className="font-bold text-text-main mb-3">{i + 1}. {quiz.question_text}</p>
                                                     <div className="space-y-2 text-sm">
-                                                        <p className={`${isCorrect ? 'text-green-800 font-medium' : 'text-red-800 line-through opacity-80'}`}>
+                                                        <p className={`${isCorrect ? 'text-green-500 font-medium' : 'text-red-500 line-through opacity-80'}`}>
                                                             <span className="font-bold">Your Answer:</span> {userAnswerText || "Left Blank"}
                                                         </p>
                                                         {!isCorrect && (
-                                                            <p className="text-green-800 font-bold bg-green-100/50 p-2 rounded inline-block w-full">
+                                                            <p className="text-green-500 font-bold bg-green-500/10 p-2 rounded inline-block w-full">
                                                                 Correct Answer: {correctAnswer?.text}
                                                             </p>
                                                         )}
@@ -136,7 +147,7 @@ export default function ArticleDetail() {
                                     </div>
                                     <button
                                         onClick={() => setQuizResult(null) || setAnswers({})}
-                                        className="w-full sm:w-auto mt-6 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold text-lg py-3 px-8 rounded-xl transition-all"
+                                        className="w-full sm:w-auto mt-6 bg-bg-card border-2 border-border-main hover:border-brand-primary text-text-main hover:text-brand-primary font-bold text-lg py-3 px-8 rounded-xl transition-all"
                                     >
                                         Retake Quiz
                                     </button>
@@ -145,14 +156,14 @@ export default function ArticleDetail() {
                                 <form onSubmit={submitQuiz} className="space-y-8">
                                     {article.quizzes.map((quiz, i) => (
                                         <div key={quiz.id} className="space-y-4">
-                                            <p className="font-bold text-lg text-slate-800">{i + 1}. {quiz.question_text}</p>
+                                            <p className="font-bold text-lg text-text-main">{i + 1}. {quiz.question_text}</p>
                                             <div className="grid gap-3">
                                                 {quiz.answers.map(ans => (
                                                     <label
                                                         key={ans.id}
                                                         className={`flex items-center gap-4 p-4 rounded-xl border-2 cursor-pointer transition-all ${answers[quiz.id] === ans.id
-                                                            ? 'border-primary-500 bg-primary-50 text-primary-900 shadow-sm'
-                                                            : 'border-slate-200 bg-white hover:border-primary-300 hover:bg-slate-50'
+                                                            ? 'border-brand-primary bg-brand-secondary/30 text-brand-primary shadow-sm'
+                                                            : 'border-border-main bg-bg-card hover:border-brand-primary/50 text-text-muted hover:text-text-main'
                                                             }`}
                                                     >
                                                         <input
@@ -164,8 +175,8 @@ export default function ArticleDetail() {
                                                             className="hidden"
                                                             required
                                                         />
-                                                        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${answers[quiz.id] === ans.id ? 'border-primary-600' : 'border-slate-300'}`}>
-                                                            {answers[quiz.id] === ans.id && <div className="w-2.5 h-2.5 bg-primary-600 rounded-full" />}
+                                                        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${answers[quiz.id] === ans.id ? 'border-brand-primary' : 'border-border-main'}`}>
+                                                            {answers[quiz.id] === ans.id && <div className="w-2.5 h-2.5 bg-brand-primary rounded-full" />}
                                                         </div>
                                                         <span className="font-medium">{ans.text}</span>
                                                     </label>
@@ -176,7 +187,7 @@ export default function ArticleDetail() {
 
                                     <button
                                         type="submit"
-                                        className="w-full sm:w-auto mt-4 bg-primary-600 hover:bg-primary-700 text-white font-bold text-lg py-4 px-10 rounded-xl shadow-lg hover:shadow-xl hover:-translate-y-1 transition-all"
+                                        className="w-full sm:w-auto mt-4 bg-gradient-to-r from-brand-gradient-1 to-brand-gradient-2 hover:opacity-90 text-white font-bold text-lg py-4 px-10 rounded-xl shadow-lg hover:shadow-xl hover:-translate-y-1 transition-all"
                                     >
                                         Submit Answers
                                     </button>
@@ -187,13 +198,13 @@ export default function ArticleDetail() {
                 )}
 
                 {/* Source Toggle */}
-                <div className="border border-slate-200 rounded-2xl overflow-hidden bg-white">
+                <div className="border border-border-main rounded-2xl overflow-hidden bg-bg-card transition-colors duration-300">
                     <button
                         onClick={() => setShowOriginal(!showOriginal)}
-                        className="w-full flex items-center justify-between p-6 bg-slate-50 hover:bg-slate-100 transition-colors font-bold text-slate-500 text-lg sm:text-xl"
+                        className="w-full flex items-center justify-between p-6 bg-bg-hover hover:bg-bg-hover/80 text-text-main font-bold text-lg sm:text-xl transition-colors"
                     >
                         <span>Show Original Complex Text (Reading Level ~12+)</span>
-                        {showOriginal ? <ChevronUp size={24} /> : <ChevronDown size={24} />}
+                        {showOriginal ? <ChevronUp size={24} className="text-brand-primary" /> : <ChevronDown size={24} className="text-text-muted" />}
                     </button>
 
                     <AnimatePresence>
@@ -202,13 +213,13 @@ export default function ArticleDetail() {
                                 initial={{ height: 0, opacity: 0 }}
                                 animate={{ height: 'auto', opacity: 1 }}
                                 exit={{ height: 0, opacity: 0 }}
-                                className="p-6 sm:p-8 bg-white"
+                                className="p-6 sm:p-8 bg-bg-card border-t border-border-main"
                             >
-                                <div className="mb-6 pb-6 border-b border-slate-100 flex justify-between items-center text-sm font-bold text-slate-400">
+                                <div className="mb-6 pb-6 border-b border-border-main flex justify-between items-center text-sm font-bold text-text-muted">
                                     <span>Source Original • {article.publisher_name}</span>
-                                    <a href={article.original_url} target="_blank" rel="noreferrer" className="text-primary-600 hover:underline">View Link ↗</a>
+                                    <a href={article.original_url} target="_blank" rel="noreferrer" className="text-brand-primary hover:text-brand-gradient-2 hover:underline transition-colors">View Link ↗</a>
                                 </div>
-                                <div className="prose prose-slate max-w-none text-slate-600">
+                                <div className="prose prose-lg max-w-none text-text-muted">
                                     <p>{article.original_text}</p>
                                 </div>
                             </motion.div>

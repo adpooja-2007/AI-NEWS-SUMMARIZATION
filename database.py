@@ -1,12 +1,34 @@
-from sqlalchemy import create_engine, Column, Integer, String, Text, Float, Boolean, ForeignKey
+from sqlalchemy import create_engine, Column, Integer, String, Text, Float, Boolean, ForeignKey, DateTime
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
+from dotenv import load_dotenv
+import os
 
-SQLALCHEMY_DATABASE_URL = "sqlite:///./sql_app.db"
+load_dotenv()
 
-engine = create_engine(
-    SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False}
-)
+# Check for a PostgreSQL/External Database URL in the environment
+DATABASE_URL = os.getenv("DATABASE_URL")
+
+# If an external URL exists, use it. Otherwise fallback to the local SQLite db.
+if DATABASE_URL:
+    # SQLAlchemy 1.4+ requires "postgresql://" instead of "postgres://"
+    if DATABASE_URL.startswith("postgres://"):
+        DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+    
+    # Supabase uses connection pooling, which requires some specific engine arguments to prevent disconnects
+    engine = create_engine(
+        DATABASE_URL, 
+        pool_pre_ping=True, 
+        pool_size=10, 
+        max_overflow=20
+    )
+else:
+    # Local SQLite Fallback
+    SQLALCHEMY_DATABASE_URL = "sqlite:///./sql_app.db"
+    engine = create_engine(
+        SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False}
+    )
+
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 Base = declarative_base()

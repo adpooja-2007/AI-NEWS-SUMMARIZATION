@@ -1,0 +1,28 @@
+Total articles in DB: 10
+
+Latest 5 articles:
+- Headline: Boy ‘injured’ in stray dog attack in Vijayawada
+  Source: India Latest News: Top National Headlines Today & Breaking News | The Hindu
+  Created at: 2026-02-24T23:49:35.409839
+  Status: PASS
+
+- Headline: Two dead after winter storm hammers the US northeast
+  Source: BBC News
+  Created at: 2026-02-24T23:45:45.896768
+  Status: PASS
+
+- Headline: Two dead after winter storm hammers the US northeast
+  Source: BBC News
+  Created at: 2026-02-24T23:45:45.683934
+  Status: PASS
+
+- Headline: 'The end of Xbox': fans split as AI exec takes over Microsoft's top gaming role
+  Source: BBC News
+  Created at: 2026-02-24T23:45:44.194716
+  Status: PASS
+
+- Headline: Floods and landslides in Brazil kill at least 20
+  Source: BBC News
+  Created at: 2026-02-24T23:35:50.695861
+  Status: PASS
+

@@ -10,7 +10,12 @@ export default function AdminDashboard() {
     const [message, setMessage] = useState(null)
 
     const fetchStats = () => {
-        fetch('http://localhost:8080/api/admin/stats')
+        const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8001'
+        const token = localStorage.getItem('token')
+
+        fetch(`${baseUrl}/api/admin/stats`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        })
             .then(res => res.json())
             .then(data => {
                 setStats(data)
@@ -30,7 +35,13 @@ export default function AdminDashboard() {
         setIngesting(true)
         setMessage(null)
         try {
-            const res = await fetch('http://localhost:8080/api/admin/ingest', { method: 'POST' })
+            const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8001'
+            const token = localStorage.getItem('token')
+
+            const res = await fetch(`${baseUrl}/api/admin/ingest`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}` }
+            })
             const data = await res.json()
             setMessage({ type: data.status === 'SUCCESS' ? 'success' : 'warn', text: data.msg || "Pipeline finished" })
             fetchStats() // refresh stats
