@@ -11,11 +11,7 @@ export default function Layout({ children }) {
 
     return (
         <div className="min-h-screen flex flex-col font-sans bg-bg-base text-text-main transition-colors duration-300">
-            {/* Top Alert Bar */}
-            <div className="bg-brand-primary/10 border-b border-brand-primary/20 text-brand-primary text-[10px] font-bold text-center py-2 tracking-widest uppercase flex items-center justify-center gap-2 transition-colors duration-300">
-                <ShieldAlert size={12} />
-                PRODUCTION ENVIRONMENT ACTIVE • STABILITY MODE
-            </div>
+
 
             {/* Main Navigation */}
             <header className="sticky top-0 z-50 bg-bg-base/80 backdrop-blur-xl border-b border-border-main transition-colors duration-300">
@@ -46,7 +42,7 @@ export default function Layout({ children }) {
                                     <Calendar size={16} />
                                     <span>Archive</span>
                                 </Link>
-                                <Link to="/admin" className={`flex items-center gap-2 text-sm font-medium transition-colors ${location.pathname === '/admin' ? 'text-brand-primary' : 'text-text-muted hover:text-text-main'}`}>
+                                <Link to="/progress" className={`flex items-center gap-2 text-sm font-medium transition-colors ${location.pathname === '/progress' ? 'text-brand-primary' : 'text-text-muted hover:text-text-main'}`}>
                                     <User size={16} />
                                     <span>Progress</span>
                                 </Link>
@@ -110,7 +106,7 @@ export default function Layout({ children }) {
                             <Calendar size={20} />
                             <span className="text-[10px] font-medium">Archive</span>
                         </Link>
-                        <Link to="/admin" className={`flex flex-col items-center gap-1 ${location.pathname === '/admin' ? 'text-brand-primary' : 'text-text-muted'}`}>
+                        <Link to="/progress" className={`flex flex-col items-center gap-1 ${location.pathname === '/progress' ? 'text-brand-primary' : 'text-text-muted'}`}>
                             <User size={20} />
                             <span className="text-[10px] font-medium">Progress</span>
                         </Link>

@@ -40,8 +40,10 @@ import os
 
 # Define allowed origins for CORS
 origins = [
-    "http://localhost:3000",          # Local React developer server
+    "http://localhost:3000",          # Local React production server
     "http://127.0.0.1:3000",
+    "http://localhost:5173",          # Local React dev server
+    "http://127.0.0.1:5173",
 ]
 
 # If deployed, allow the production frontend URL
@@ -163,13 +165,18 @@ async def submit_quiz(article_id: str, request: Request, current_user: dict = De
                     
         score_pct = (correct_count / total_count) * 100
         
+        from datetime import datetime, timezone, timedelta
+        ist_tz = timezone(timedelta(hours=5, minutes=30))
+        
         # Save metric
         metric_doc = {
+            "user_id": current_user["id"],
             "article_id": str(obj_id),
+            "action": "quiz",
             "quiz_score_pct": score_pct,
             "time_on_page_seconds": 120,
             "viewed_original": payload.get("viewed_original", False),
-            "created_at": str(os.getenv("CURRENT_TIME", "Now"))
+            "created_at": str(os.getenv("CURRENT_TIME", lambda: datetime.now(ist_tz).isoformat()) if callable(os.getenv("CURRENT_TIME")) else os.getenv("CURRENT_TIME", datetime.now(ist_tz).isoformat()))
         }
         await metrics_collection.insert_one(metric_doc)
         
@@ -181,25 +188,102 @@ async def submit_quiz(article_id: str, request: Request, current_user: dict = De
         }
     return {"score": 0, "correct": 0, "total": 0, "correct_answers": {}}
 
-@app.get("/api/admin/stats")
-async def get_admin_stats(current_user: dict = Depends(get_current_user)):
-    """API: Get dashboard metrics"""
-    total = await articles_collection.count_documents({})
-    successful = await articles_collection.count_documents({"processing_status": "PASS"})
+import datetime
+
+@app.post("/api/articles/{article_id}/view")
+async def record_article_view(article_id: str, current_user: dict = Depends(get_current_user)):
+    """API: Record an article view for a user"""
+    try:
+        obj_id = ObjectId(article_id)
+    except:
+        return {"error": "Invalid Article ID format"}
+        
+    from datetime import datetime, timezone, timedelta
+    ist_tz = timezone(timedelta(hours=5, minutes=30))
+    metric_doc = {
+        "user_id": current_user["id"],
+        "article_id": str(obj_id),
+        "action": "view",
+        "created_at": datetime.now(ist_tz).isoformat()
+    }
+    await metrics_collection.insert_one(metric_doc)
+    return {"status": "success"}
+
+@app.get("/api/user/stats")
+async def get_user_stats(current_user: dict = Depends(get_current_user)):
+    """API: Get personalized dashboard metrics"""
+    user_id = current_user["id"]
     
-    cursor = metrics_collection.find({})
-    metrics = await cursor.to_list(length=1000)
-    avg_score = sum(m.get("quiz_score_pct", 0) for m in metrics) / len(metrics) if metrics else 0
+    # Get all metrics for this specific user, sorted by newest first
+    cursor = metrics_collection.find({"user_id": user_id}).sort("created_at", -1)
+    user_metrics = await cursor.to_list(length=1000)
     
-    success_cursor = articles_collection.find({"processing_status": "PASS"})
-    success_arts = await success_cursor.to_list(length=1000)
-    avg_readability = sum(a.get("readability_score", 0) for a in success_arts) / len(success_arts) if success_arts else 0
+    view_metrics = [m for m in user_metrics if m.get("action") == "view"]
+    quiz_metrics = [m for m in user_metrics if m.get("action") == "quiz"]
+    
+    total_articles_read = len(set(m.get("article_id") for m in view_metrics))
+    avg_score = sum(m.get("quiz_score_pct", 0) for m in quiz_metrics) / len(quiz_metrics) if quiz_metrics else 0
+    
+    # Collect all unique article IDs from metrics to fetch titles
+    all_article_ids_str = list(set([m.get("article_id") for m in user_metrics if m.get("article_id")]))
+    
+    article_headlines = {}
+    avg_readability = 0
+    
+    if all_article_ids_str:
+        try:
+            object_ids = [ObjectId(aid) for aid in all_article_ids_str]
+            articles_cursor = articles_collection.find({"_id": {"$in": object_ids}})
+            all_articles = await articles_cursor.to_list(length=1000)
+            
+            # Map ID to Headline for quick lookup
+            article_headlines = {str(a["_id"]): a.get("simplified_headline", "Unknown Article") for a in all_articles}
+            
+            # Calculate average readability only for articles they viewed
+            read_article_ids_str = set(m.get("article_id") for m in view_metrics if m.get("article_id"))
+            read_articles = [a for a in all_articles if str(a["_id"]) in read_article_ids_str]
+            if read_articles:
+                avg_readability = sum(a.get("readability_score", 0) for a in read_articles) / len(read_articles)
+        except Exception as e:
+            print(f"Error fetching articles for stats: {e}")
+            
+    global_total = await articles_collection.count_documents({"processing_status": "PASS"})
+    
+    # Build Reading History (limit 15 unique articles)
+    reading_history = []
+    seen_articles_history = set()
+    for m in view_metrics:
+        aid = m.get("article_id")
+        if aid not in seen_articles_history and aid in article_headlines:
+            reading_history.append({
+                "article_id": aid,
+                "headline": article_headlines[aid],
+                "date": m.get("created_at")
+            })
+            seen_articles_history.add(aid)
+            if len(reading_history) >= 15:
+                break
+                
+    # Build Quiz History (limit 15 recent quizzes)
+    quiz_history = []
+    for m in quiz_metrics:
+        aid = m.get("article_id")
+        quiz_history.append({
+            "article_id": aid,
+            "headline": article_headlines.get(aid, "Unknown Article"),
+            "score": m.get("quiz_score_pct", 0),
+            "date": m.get("created_at")
+        })
+        if len(quiz_history) >= 15:
+            break
     
     return {
-        "total_processed": total,
-        "successful": successful,
+        "articles_read": total_articles_read,
+        "global_total_articles": global_total,
         "avg_score": round(avg_score, 1),
-        "avg_readability": round(avg_readability, 2)
+        "avg_readability": round(avg_readability, 2),
+        "reading_history": reading_history,
+        "quiz_history": quiz_history
     }
 
 @app.post("/api/admin/ingest")

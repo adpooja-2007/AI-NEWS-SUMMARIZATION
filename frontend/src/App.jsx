@@ -36,7 +36,7 @@ function App() {
                             <Route path="/" element={<ProtectedRoute><Feed /></ProtectedRoute>} />
                             <Route path="/archive" element={<ProtectedRoute><ArchivePage /></ProtectedRoute>} />
                             <Route path="/article/:id" element={<ProtectedRoute><ArticleDetail /></ProtectedRoute>} />
-                            <Route path="/admin" element={<ProtectedRoute><AdminDashboard /></ProtectedRoute>} />
+                            <Route path="/progress" element={<ProtectedRoute><AdminDashboard /></ProtectedRoute>} />
 
                             {/* Public Routes */}
                             <Route path="/login" element={<Login />} />

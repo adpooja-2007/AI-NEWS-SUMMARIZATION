@@ -1,19 +1,17 @@
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Link } from 'react-router-dom'
-import { ArrowLeft, RefreshCw, BarChart3, AlertCircle, FileText, Activity } from 'lucide-react'
+import { ArrowLeft, BarChart3, AlertCircle, FileText, Activity, ShieldCheck, Clock, BookOpen, CheckCircle, Target } from 'lucide-react'
 
 export default function AdminDashboard() {
     const [stats, setStats] = useState(null)
     const [loading, setLoading] = useState(true)
-    const [ingesting, setIngesting] = useState(false)
-    const [message, setMessage] = useState(null)
 
     const fetchStats = () => {
         const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8001'
         const token = localStorage.getItem('token')
 
-        fetch(`${baseUrl}/api/admin/stats`, {
+        fetch(`${baseUrl}/api/user/stats`, {
             headers: { 'Authorization': `Bearer ${token}` }
         })
             .then(res => res.json())
@@ -31,57 +29,47 @@ export default function AdminDashboard() {
         fetchStats()
     }, [])
 
-    const handleIngest = async () => {
-        setIngesting(true)
-        setMessage(null)
-        try {
-            const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8001'
-            const token = localStorage.getItem('token')
-
-            const res = await fetch(`${baseUrl}/api/admin/ingest`, {
-                method: 'POST',
-                headers: { 'Authorization': `Bearer ${token}` }
-            })
-            const data = await res.json()
-            setMessage({ type: data.status === 'SUCCESS' ? 'success' : 'warn', text: data.msg || "Pipeline finished" })
-            fetchStats() // refresh stats
-        } catch (err) {
-            setMessage({ type: 'error', text: 'Pipeline failed to respond.' })
-        }
-        setIngesting(false)
-    }
-
     if (loading) {
         return (
             <div className="flex justify-center items-center h-64">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-4 border-primary-600"></div>
+                <div className="animate-spin rounded-full h-12 w-12 border-b-4 border-brand-primary"></div>
             </div>
         )
     }
 
+    const formatDate = (isoString) => {
+        if (!isoString || isoString === "Now") return "Just now"
+        const date = new Date(isoString)
+        if (isNaN(date.getTime())) return "Recently"
+        return new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }).format(date)
+    }
+
     return (
-        <div className="space-y-8">
-            <Link to="/" className="inline-flex items-center gap-2 text-slate-500 hover:text-primary-600 font-semibold transition-colors">
+        <div className="space-y-12 transition-colors duration-300">
+            <Link to="/" className="inline-flex items-center gap-2 text-text-muted hover:text-brand-primary font-semibold transition-colors">
                 <ArrowLeft size={20} /> Back to Platform
             </Link>
 
-            <div className="mb-10 text-center sm:text-left">
-                <h2 className="text-4xl font-black tracking-tight text-slate-900 mb-3 flex items-center justify-center sm:justify-start gap-3">
-                    <Activity className="text-primary-600" size={36} /> Platform Health
+            <div className="text-center sm:text-left">
+                <h2 className="text-4xl sm:text-5xl font-black tracking-tight text-text-main mb-4 flex items-center justify-center sm:justify-start gap-4 transition-colors">
+                    <Activity className="text-brand-primary" size={40} /> Your Progress
                 </h2>
-                <p className="text-xl text-slate-600 font-medium">Real-time metrics for pilot studies</p>
+                <p className="text-xl text-text-muted font-medium transition-colors max-w-2xl">
+                    Track your reading history, analyze your comprehension scores, and witness your growth.
+                </p>
             </div>
 
+            {/* Top Level Aggregate Stats */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                 <MetricCard
                     icon={<FileText />}
-                    label="Articles Processed"
-                    value={stats?.total_processed || 0}
+                    label="Articles Read"
+                    value={stats?.articles_read || 0}
                 />
                 <MetricCard
-                    icon={<ShieldCheckIcon />}
-                    label="Successfully Simplified"
-                    value={`${stats?.successful || 0} / ${stats?.total_processed || 0}`}
+                    icon={<ShieldCheck />}
+                    label="Platform Articles"
+                    value={`${stats?.global_total_articles || 0}`}
                     success
                 />
                 <MetricCard
@@ -92,63 +80,118 @@ export default function AdminDashboard() {
                 />
                 <MetricCard
                     icon={<AlertCircle />}
-                    label="Avg Readability Level"
+                    label="Avg Reading Level"
                     value={`Grade ${stats?.avg_readability || 0}`}
                     highlight
                 />
             </div>
 
-            <div className="bg-white border-2 border-slate-200 rounded-3xl p-8 sm:p-10 shadow-sm mt-12">
-                <h3 className="text-2xl font-black text-slate-900 mb-4">Pipeline Control</h3>
-                <p className="text-slate-500 text-lg mb-8 font-medium max-w-2xl">
-                    The ingestion worker normally runs via an automated cron-job. For this demonstration, you can manually trigger the pipeline to pull an RSS item and run the AI simplification modules.
-                </p>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mt-12">
+                {/* Left Column: Reading History */}
+                <div className="bg-bg-card border border-border-main rounded-3xl p-6 sm:p-8 shadow-sm transition-colors duration-300">
+                    <div className="flex items-center gap-3 mb-8">
+                        <div className="p-2.5 bg-brand-secondary rounded-xl">
+                            <BookOpen className="text-brand-primary" size={24} />
+                        </div>
+                        <h3 className="text-2xl font-black text-text-main tracking-tight">Reading History</h3>
+                    </div>
 
-                <AnimatePresence>
-                    {message && (
-                        <motion.div
-                            initial={{ height: 0, opacity: 0 }}
-                            animate={{ height: 'auto', opacity: 1 }}
-                            exit={{ height: 0, opacity: 0 }}
-                            className={`mb-6 p-4 rounded-xl font-bold flex items-center gap-3 border-2 ${message.type === 'success' ? 'bg-green-50 text-green-700 border-green-200' :
-                                message.type === 'error' ? 'bg-red-50 text-red-700 border-red-200' :
-                                    'bg-yellow-50 text-yellow-700 border-yellow-200'
-                                }`}
-                        >
-                            <div className={message.type === 'success' ? 'bg-green-100 p-1.5 rounded-full' : 'bg-yellow-100 p-1.5 rounded-full'}>
-                                {message.type === 'success' ? '✓' : '!'}
-                            </div>
-                            {message.text}
-                        </motion.div>
-                    )}
-                </AnimatePresence>
-
-                <button
-                    onClick={handleIngest}
-                    disabled={ingesting}
-                    className="bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white font-bold py-4 px-8 rounded-xl flex items-center justify-center gap-3 w-full sm:w-auto transition-colors shadow-md"
-                >
-                    {ingesting ? (
-                        <>
-                            <RefreshCw className="animate-spin" size={20} /> Pipeline Running...
-                        </>
+                    {!stats?.reading_history || stats.reading_history.length === 0 ? (
+                        <div className="text-center py-12 px-4 border-2 border-dashed border-border-main rounded-2xl">
+                            <BookOpen size={40} className="mx-auto text-text-muted/50 mb-3" />
+                            <p className="text-text-muted font-medium text-lg">No articles read yet.</p>
+                            <p className="text-sm text-text-muted/70 mt-1">Start exploring the feed to build your history.</p>
+                        </div>
                     ) : (
-                        <>
-                            <RefreshCw size={20} /> Trigger Demo Ingestion
-                        </>
+                        <div className="space-y-4">
+                            {stats.reading_history.map((item, index) => (
+                                <motion.div
+                                    key={`read-${index}`}
+                                    initial={{ opacity: 0, y: 10 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    transition={{ delay: index * 0.05 }}
+                                    className="group flex gap-4 p-4 rounded-2xl hover:bg-bg-hover border border-transparent hover:border-border-main transition-all duration-300"
+                                >
+                                    <div className="hidden sm:flex flex-col items-center mt-1">
+                                        <div className="w-2.5 h-2.5 rounded-full bg-brand-primary shadow-[0_0_10px_rgba(var(--brand-primary),0.5)]"></div>
+                                        {index !== stats.reading_history.length - 1 && (
+                                            <div className="w-0.5 h-full bg-border-main mt-2 group-hover:bg-brand-primary/20 transition-colors"></div>
+                                        )}
+                                    </div>
+                                    <div className="flex-1">
+                                        <Link to={`/article/${item.article_id}`} className="block">
+                                            <h4 className="text-lg font-bold text-text-main group-hover:text-brand-primary transition-colors leading-tight mb-1.5">
+                                                {item.headline || 'Unknown Article'}
+                                            </h4>
+                                            <div className="flex items-center gap-2 text-xs font-semibold text-text-muted uppercase tracking-wider">
+                                                <Clock size={12} />
+                                                {formatDate(item.date)}
+                                            </div>
+                                        </Link>
+                                    </div>
+                                </motion.div>
+                            ))}
+                        </div>
                     )}
-                </button>
+                </div>
 
-                <div className="mt-12 p-8 bg-slate-50 border border-slate-200 rounded-2xl relative overflow-hidden group">
-                    <div className="absolute top-0 left-0 w-2 h-full bg-amber-500"></div>
-                    <h4 className="font-black text-slate-800 text-xl mb-6">Backend Orchestration Steps</h4>
-                    <ol className="space-y-4 font-semibold text-slate-600 relative z-10">
-                        <li className="flex gap-3"><span className="bg-amber-100 text-amber-700 px-2 py-0.5 rounded text-sm">1</span> Fetch article from mock RSS feeds.</li>
-                        <li className="flex gap-3"><span className="bg-amber-100 text-amber-700 px-2 py-0.5 rounded text-sm">2</span> Extract base entities & facts (Layer 1).</li>
-                        <li className="flex gap-3"><span className="bg-amber-100 text-amber-700 px-2 py-0.5 rounded text-sm">3</span> Restructure to Grade 6 active voice limit (Layer 2).</li>
-                        <li className="flex gap-3"><span className="bg-amber-100 text-amber-700 px-2 py-0.5 rounded text-sm">4</span> Cosine similarity Fact-Check verification.</li>
-                        <li className="flex gap-3"><span className="bg-amber-100 text-amber-700 px-2 py-0.5 rounded text-sm">5</span> Auto-generate distractors & quizzes.</li>
-                    </ol>
+                {/* Right Column: Quiz Ledger */}
+                <div className="bg-bg-card border border-border-main rounded-3xl p-6 sm:p-8 shadow-sm transition-colors duration-300">
+                    <div className="flex items-center gap-3 mb-8">
+                        <div className="p-2.5 bg-green-500/10 rounded-xl">
+                            <Target className="text-green-500" size={24} />
+                        </div>
+                        <h3 className="text-2xl font-black text-text-main tracking-tight">Quiz Ledger</h3>
+                    </div>
+
+                    {!stats?.quiz_history || stats.quiz_history.length === 0 ? (
+                        <div className="text-center py-12 px-4 border-2 border-dashed border-border-main rounded-2xl">
+                            <CheckCircle size={40} className="mx-auto text-text-muted/50 mb-3" />
+                            <p className="text-text-muted font-medium text-lg">No quizzes taken.</p>
+                            <p className="text-sm text-text-muted/70 mt-1">Test your comprehension at the end of any article.</p>
+                        </div>
+                    ) : (
+                        <div className="grid gap-3">
+                            {stats.quiz_history.map((quiz, index) => (
+                                <motion.div
+                                    key={`quiz-${index}`}
+                                    initial={{ opacity: 0, x: 20 }}
+                                    animate={{ opacity: 1, x: 0 }}
+                                    transition={{ delay: index * 0.05 }}
+                                    className="group flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-2xl bg-bg-card border border-border-main hover:border-brand-primary/40 hover:shadow-md transition-all duration-300 relative overflow-hidden"
+                                >
+                                    {/* Subtle left accent bar based on score */}
+                                    <div className={`absolute left-0 top-0 bottom-0 w-1 ${quiz.score >= 80 ? 'bg-green-500' : quiz.score >= 60 ? 'bg-yellow-500' : 'bg-red-500'}`}></div>
+
+                                    <div className="flex-1 min-w-0 pl-2">
+                                        <div className="flex items-center gap-2 text-xs font-semibold text-text-muted mb-2 uppercase tracking-wider">
+                                            <Clock size={12} />
+                                            {formatDate(quiz.date)}
+                                        </div>
+                                        <Link to={`/article/${quiz.article_id}`} className="block">
+                                            <h4 className="text-base sm:text-lg font-bold text-text-main group-hover:text-brand-primary transition-colors leading-snug line-clamp-2">
+                                                {quiz.headline || 'Unknown Article'}
+                                            </h4>
+                                        </Link>
+                                    </div>
+
+                                    <div className="flex sm:flex-col items-center justify-between sm:items-end shrink-0 pl-2 pt-3 sm:pt-0 sm:pl-4 border-t sm:border-t-0 sm:border-l border-border-main/50">
+                                        <div className="text-[10px] text-text-muted font-bold uppercase tracking-widest sm:mb-1">
+                                            Score
+                                        </div>
+                                        <div className={`px-4 py-1.5 rounded-full font-black text-lg shadow-sm border ${quiz.score >= 80
+                                                ? 'bg-green-500/10 text-green-600 border-green-500/20'
+                                                : quiz.score >= 60
+                                                    ? 'bg-yellow-500/10 text-yellow-600 border-yellow-500/20'
+                                                    : 'bg-red-500/10 text-red-600 border-red-500/20'
+                                            }`}>
+                                            {quiz.score}%
+                                        </div>
+                                    </div>
+                                </motion.div>
+                            ))}
+                        </div>
+                    )}
                 </div>
             </div>
         </div>
@@ -159,28 +202,24 @@ function MetricCard({ label, value, highlight, success, icon }) {
     return (
         <motion.div
             whileHover={{ y: -4 }}
-            className={`p-6 rounded-2xl border-2 transition-all cursor-default relative overflow-hidden shadow-sm ${highlight ? 'bg-primary-50 border-primary-200' :
-                success ? 'bg-green-50 border-green-200' :
-                    'bg-white border-slate-200'
+            className={`p-6 rounded-2xl border-2 transition-all cursor-default relative overflow-hidden shadow-sm duration-300 ${highlight ? 'bg-brand-secondary border-brand-primary/20' :
+                success ? 'bg-green-500/10 border-green-500/20' :
+                    'bg-bg-card border-border-main'
                 }`}
         >
-            <div className={`absolute top-4 right-4 opacity-50 ${highlight ? 'text-primary-500' : success ? 'text-green-500' : 'text-slate-300'}`}>
+            <div className={`absolute top-4 right-4 opacity-50 ${highlight ? 'text-brand-primary' : success ? 'text-green-500' : 'text-text-muted/50'}`}>
                 {icon}
             </div>
-            <p className={`font-black text-sm uppercase tracking-wider mb-2 z-10 relative ${highlight ? 'text-primary-700' :
-                success ? 'text-green-700' :
-                    'text-slate-500'
+            <p className={`font-black text-sm uppercase tracking-wider mb-2 z-10 relative ${highlight ? 'text-brand-primary' :
+                success ? 'text-green-500' :
+                    'text-text-muted'
                 }`}>{label}</p>
-            <p className={`text-4xl font-extrabold z-10 relative tracking-tighter ${highlight ? 'text-primary-900' :
-                success ? 'text-green-900' :
-                    'text-slate-800'
+            <p className={`text-4xl font-extrabold z-10 relative tracking-tighter ${highlight ? 'text-brand-primary' :
+                success ? 'text-green-500' :
+                    'text-text-main'
                 }`}>{value}</p>
         </motion.div>
     )
 }
 
-function ShieldCheckIcon() {
-    return (
-        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" /><path d="m9 12 2 2 4-4" /></svg>
-    )
-}
+

@@ -71,7 +71,7 @@ async def login(user_credentials: UserLogin):
     user = await users_collection.find_one({"email": user_credentials.email})
     if not user:
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, invalid_detail="Invalid Credentials"
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid Credentials"
         )
 
     if not verify_password(user_credentials.password, user["hashed_password"]):

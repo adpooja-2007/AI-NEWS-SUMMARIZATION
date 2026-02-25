@@ -19,7 +19,7 @@
     --color-brand-gradient-1: var(--theme-brand-gradient-1);
     --color-brand-gradient-2: var(--theme-brand-gradient-2);
 
-    --font-sans: "Inter", system-ui, -apple-system, sans-serif;
+    --font-sans: "Playfair Display", system-ui, -apple-system, sans-serif;
 }
 
 :root {

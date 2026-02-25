@@ -27,6 +27,13 @@ export default function ArticleDetail() {
                 console.error("Failed to fetch article", err)
                 setLoading(false)
             })
+
+        // Record article view in the background
+        fetch(`${baseUrl}/api/articles/${id}/view`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}` }
+        }).catch(err => console.error("Failed to record view", err))
+
     }, [id])
 
     const handleSelectAnswer = (quizId, answerId) => {
