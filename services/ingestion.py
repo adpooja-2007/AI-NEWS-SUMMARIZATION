@@ -503,8 +503,16 @@ async def ingest_rss_feed():
                 break
                 
             link = item.get("link", "")
-            # Check if already processed
-            existing = await articles_collection.find_one({"original.source_url": link})
+            title = item.get("title", "").strip()
+            
+            # Check if already processed (Catch dynamic URL tracking params by matching headlines too)
+            existing = await articles_collection.find_one({
+                "$or": [
+                    {"original.source_url": link},
+                    {"original.headline": title},
+                    {"simplified_headline": title}
+                ]
+            })
             if existing:
                 skipped_existing += 1
                 continue

@@ -217,31 +217,36 @@ export default function ArticleDetail() {
                     )}
                 </div>
 
-                {/* TTS Play Button */}
-                <div className="flex items-center gap-4 mb-8">
+                {/* Soft-Tinted Minimalist TTS Play Button */}
+                <div className="flex items-center gap-4 mb-10">
                     <button
                         onClick={toggleSpeech}
-                        className={`flex items-center gap-2 px-6 py-3 rounded-full font-bold transition-all shadow-sm ${isSpeaking
-                            ? 'bg-red-500 hover:bg-red-600 text-white shadow-red-500/20'
-                            : 'bg-brand-primary hover:bg-brand-secondary text-white shadow-brand-primary/20'
+                        className={`flex items-center justify-center gap-3 px-6 py-3 rounded-full font-bold text-[15px] transition-all duration-300 border-2 ${isSpeaking
+                            ? 'bg-red-50 text-red-600 border-red-200 hover:bg-red-100 dark:bg-red-500/10 dark:text-red-400 dark:border-red-500/30 dark:hover:bg-red-500/20'
+                            : 'bg-brand-primary/5 text-brand-primary border-brand-primary/20 hover:bg-brand-primary/10 hover:border-brand-primary/40 dark:bg-brand-primary/10 dark:border-brand-primary/30 dark:hover:bg-brand-primary/20'
                             }`}
+                        style={{ minWidth: '150px' }}
                     >
                         {isSpeaking ? (
                             <>
-                                <Square size={20} className="fill-current" />
-                                {t('stopAudio')}
+                                <Square size={16} className="fill-current" />
+                                <span>{t('stopAudio')}</span>
+                                <span className="flex h-2.5 w-2.5 relative ml-1">
+                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 dark:bg-red-300 opacity-75"></span>
+                                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500 dark:bg-red-400"></span>
+                                </span>
                             </>
                         ) : (
                             <>
-                                <Volume2 size={20} />
-                                {t('listenAudio')}
+                                <Volume2 size={18} />
+                                <span>{t('listenAudio')}</span>
                             </>
                         )}
                     </button>
                     {!isSpeaking && (
-                        <p className="text-text-muted text-sm font-medium">
+                        <div className="text-text-muted text-sm font-medium opacity-80 pl-2">
                             {t('readSilently')}
-                        </p>
+                        </div>
                     )}
                 </div>
 
